@@ -1,12 +1,26 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "web/dist",
-  "functions": {
-    "api/units.js": {
-      "includeFiles": "grammar-units.json"
+  "version": 2,
+  "builds": [
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/units.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "grammar-units.json"
+      }
     }
-  },
+  ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/units.js"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
