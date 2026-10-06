@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Latihan Grammar - English Grammar in Use</title>
+<style>
+:root{--bg:#f5f7f4;--card:#fff;--ink:#1d2b28;--mut:#5d6b67;--line:#d9e0dc;--acc:#1f6f5c;--accb:#e3f1ec;--ok:#177a45;--okb:#dff3e7;--bad:#b3261e;--badb:#fbe4e2;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121816;--card:#1a2320;--ink:#e8efec;--mut:#9fb0aa;--line:#2c3935;--acc:#5cc2a6;--accb:#1d3a32;--ok:#6fd49b;--okb:#17342498;--bad:#ff8a80;--badb:#3d1f1d}}
+:root[data-theme="dark"]{--bg:#121816;--card:#1a2320;--ink:#e8efec;--mut:#9fb0aa;--line:#2c3935;--acc:#5cc2a6;--accb:#1d3a32;--ok:#6fd49b;--okb:#173424;--bad:#ff8a80;--badb:#3d1f1d}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 Georgia,"Times New Roman",serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1,h2,h3,button,.ui{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+h1{font-size:1.7rem;margin:.2em 0 .1em}h2{font-size:1.3rem;margin:.2em 0}
+p{margin:.4em 0}.mut{color:var(--mut);font-size:.92rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
+.unit{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:14px;margin:8px 0;font-size:1rem;cursor:pointer}
+.unit:hover{border-color:var(--acc)}.unit[disabled]{opacity:.5;cursor:default}
+.badge{font-size:.85rem;color:var(--acc);white-space:nowrap}
+.btn{background:var(--acc);color:var(--bg);border:0;border-radius:8px;padding:11px 18px;font-size:1rem;cursor:pointer;margin-top:10px}
+.btn.alt{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.bar{height:6px;background:var(--line);border-radius:3px;margin:8px 0 14px}.bar i{display:block;height:100%;background:var(--acc);border-radius:3px}
+.opt{display:block;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:12px;margin:8px 0;font-size:1rem;cursor:pointer}
+.opt.ok{background:var(--okb);border-color:var(--ok)}.opt.bad{background:var(--badb);border-color:var(--bad)}
+input[type=text]{width:100%;padding:12px;font-size:1rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);margin:8px 0}
+.fb{padding:12px;border-radius:8px;margin:12px 0;font-family:system-ui,sans-serif;font-size:.95rem}
+.fb.ok{background:var(--okb)}.fb.bad{background:var(--badb)}
+.ex{margin:.2em 0;padding-left:1em;border-left:3px solid var(--accb)}
+.unit{padding:10px 14px;margin:6px 0}h3{font-size:1rem;margin:22px 0 4px;color:var(--acc)}.top{display:flex;justify-content:space-between;align-items:center}
+.link{background:none;border:0;color:var(--acc);cursor:pointer;font-size:.95rem;padding:4px 0}
+.q{font-size:1.15rem;margin:.3em 0 .6em}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script src="data/units.js"></script>
+<script>
+var G=window.GRAMMAR_DATA,T=[],D=[];
+G.units.forEach(function(u){
+  var g=T.length&&T[T.length-1][0]==u.section.title?T[T.length-1]:null;
+  if(!g){g=[u.section.title,[]];T.push(g)}
+  g[1].push(u.title);
+  var q=u.practice.questions.map(function(x){return x.type=='multiple_choice'?['m',x.prompt,x.options,x.answer_index,x.explanation]:['f',x.prompt,x.accepted_answers,x.explanation]});
+  D.push({n:u.unit,t:u.title,u:u,q:q})});
+var app=document.getElementById('app'),S={},P={};
+try{P=JSON.parse(localStorage.getItem('gu_prog')||'{}')}catch(e){P={}}
+function save(){try{localStorage.setItem('gu_prog',JSON.stringify(P))}catch(e){}}
+function norm(s){return s.toLowerCase().replace(/[’`]/g,"'").replace(/\s+/g,' ').trim().replace(/[.!?]$/,'')}
+function home(){
+  var done=Object.keys(P).length,n=0;
+  var h='<h1>Latihan Grammar</h1><p class="mut ui">Berdasarkan daftar isi English Grammar in Use. Tiap unit punya penjelasan dan latihan.</p>';
+  h+='<div class="bar"><i style="width:'+(done/D.length*100)+'%"></i></div><p class="mut ui">'+done+' dari '+D.length+' unit sudah dicoba</p>';
+  T.forEach(function(g){h+='<h3 class="ui">'+g[0]+'</h3>';
+    g[1].forEach(function(t){var i=n++,d=D[i];
+      var b=P[d.n]!=null?'Skor '+P[d.n]+'/'+d.q.length:d.q.length+' soal';
+      h+='<button class="unit ui" onclick="intro('+i+')"><span><b>'+d.n+'</b> · '+t+'</span><span class="badge">'+b+'</span></button>'})});
+  app.innerHTML=h;window.scrollTo(0,0)}
+function intro(i){var d=D[i],u=d.u,e=u.explanation;S={u:i,i:0,sc:0,ans:false};
+  var h='<button class="link" onclick="home()">‹ Semua unit</button><h2>Unit '+u.unit+': '+u.title+'</h2><div class="card"><p>'+e.summary+'</p><p class="mut ui">Pola: '+e.pattern+'</p><ul>';
+  e.key_points.forEach(function(k){h+='<li>'+k+'</li>'});h+='</ul>';
+  e.examples.forEach(function(x){h+='<p class="ex">'+x.en+(x.id?'<br><span class="mut ui">'+x.id+'</span>':'')+'</p>'});
+  e.common_mistakes.forEach(function(m){h+='<p class="ui"><b>Kesalahan umum:</b> <s>'+m.wrong+'</s> → '+m.correct+'</p>'});
+  h+='<p class="mut ui">Rujukan: halaman PDF '+u.pdf_pages.explanation+' (penjelasan) dan '+u.pdf_pages.exercises+' (latihan)</p></div>';
+  if(d.q.length)h+='<button class="btn" onclick="quiz()">Mulai latihan ('+d.q.length+' soal)</button>';
+  app.innerHTML=h;window.scrollTo(0,0)}
+function quiz(){var u=D[S.u],q=u.q[S.i];S.ans=false;
+  var h='<div class="top"><button class="link" onclick="home()">‹ Keluar</button><span class="mut ui">Soal '+(S.i+1)+' dari '+u.q.length+'</span></div>';
+  h+='<div class="bar"><i style="width:'+(S.i/u.q.length*100)+'%"></i></div><div class="card"><p class="q">'+q[1]+'</p>';
+  if(q[0]=='m'){q[2].forEach(function(o,k){h+='<button class="opt ui" onclick="pick('+k+')">'+o+'</button>'})}
+  else{h+='<input type="text" id="fi" autocomplete="off" autocapitalize="off" aria-label="Jawaban"><button class="btn" onclick="fill()">Periksa jawaban</button>'}
+  h+='</div><div id="fb"></div>';app.innerHTML=h;
+  var f=document.getElementById('fi');if(f){f.addEventListener('keydown',function(e){if(e.key=='Enter')fill()});f.focus()}}
+function show(ok,exp,ans){S.ans=true;if(ok)S.sc++;var u=D[S.u],last=S.i==u.q.length-1;
+  document.getElementById('fb').innerHTML='<div class="fb '+(ok?'ok':'bad')+'"><b>'+(ok?'Benar.':'Belum tepat.')+'</b> '+(ok?'':'Jawaban: '+ans+'. ')+exp+'</div><button class="btn" onclick="next()">'+(last?'Lihat hasil':'Soal berikutnya')+'</button>'}
+function pick(k){if(S.ans)return;var q=D[S.u].q[S.i],bs=document.querySelectorAll('.opt');
+  bs.forEach(function(b,j){if(j==q[3])b.classList.add('ok');else if(j==k)b.classList.add('bad')});
+  show(k==q[3],q[4],q[2][q[3]])}
+function fill(){if(S.ans)return;var q=D[S.u].q[S.i],v=norm(document.getElementById('fi').value);if(!v)return;
+  var ok=q[2].some(function(a){return norm(a)==v||norm(a).replace(/^'/,'')==v||v==norm(a)});
+  var full=q[2][0].charAt(0)=="'"?q[2][1]||q[2][0]:q[2][0];
+  document.getElementById('fi').disabled=true;show(ok,q[3],full)}
+function next(){var u=D[S.u];S.i++;if(S.i<u.q.length)return quiz();
+  if(P[u.n]==null||S.sc>P[u.n])P[u.n]=S.sc;save();
+  var pct=Math.round(S.sc/u.q.length*100);
+  app.innerHTML='<h2>Hasil Unit '+u.n+'</h2><div class="card"><p class="q">Skor: '+S.sc+' dari '+u.q.length+' ('+pct+'%)</p><p>'+(pct>=80?'Bagus, konsepnya sudah dikuasai.':pct>=50?'Cukup baik. Baca ringkasan lagi lalu coba ulang.':'Baca ringkasan unit sekali lagi, lalu ulangi latihannya.')+'</p></div><button class="btn" onclick="intro('+S.u+')">Ulangi unit ini</button> <button class="btn alt" onclick="home()">Semua unit</button>';
+  window.scrollTo(0,0)}
+home();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Grammar units","type":"object","required":["schema_version","book","sections","units"],
+"properties":{"schema_version":{"type":"string"},"book":{"type":"object"},"sections":{"type":"array","items":{"type":"object","required":["id","order","title","units"]}},
+"units":{"type":"array","items":{"type":"object","required":["id","unit","slug","section","title","pdf_pages","explanation","practice"],
+"properties":{"id":{"type":"string","pattern":"^u[0-9]{3}$"},"unit":{"type":"integer","minimum":1,"maximum":145},"slug":{"type":"string"},
+"section":{"type":"object","required":["id","title","order"]},"title":{"type":"string"},
+"pdf_pages":{"type":"object","required":["explanation","exercises"]},
+"explanation":{"type":"object","required":["summary","pattern","key_points","examples","common_mistakes"],"properties":{"summary":{"type":"string"},"pattern":{"type":"string"},"key_points":{"type":"array","items":{"type":"string"}},"examples":{"type":"array","items":{"type":"object","required":["en"],"properties":{"en":{"type":"string"},"id":{"type":"string"}}}},"common_mistakes":{"type":"array","items":{"type":"object","required":["wrong","correct"]}}}},
+"related_units":{"type":"array","items":{"type":"integer"}},
+"practice":{"type":"object","required":["status","questions"],"properties":{"status":{"enum":["ready","starter","pending"]},"questions":{"type":"array","items":{"type":"object","required":["id","type","prompt","explanation"],
+"properties":{"id":{"type":"string"},"type":{"enum":["multiple_choice","fill_blank"]},"prompt":{"type":"string","description":"Fill_blank memakai ___ sebagai tempat kosong"},"options":{"type":"array","items":{"type":"string"}},"answer_index":{"type":"integer"},"accepted_answers":{"type":"array","items":{"type":"string"}},"explanation":{"type":"string"},"difficulty":{"enum":["basic","medium","hard"]},"source":{"enum":["authored","starter_auto","ai_generated"]}}}}}}}}}}}
