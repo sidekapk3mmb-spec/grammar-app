@@ -34,7 +34,7 @@ app.post('/api/units', (req, res) => {
 app.use(express.static(path.join(__dirname, 'web/dist')));
 
 // Catch-all route to support React Router (SPA)
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'web/dist/index.html'));
 });
 
