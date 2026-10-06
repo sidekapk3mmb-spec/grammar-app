@@ -39,6 +39,13 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`API Server running at http://localhost:${PORT}`);
-});
+
+// Only listen if not running on Vercel (Vercel uses module.exports)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`API Server running at http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless function
+module.exports = app;
