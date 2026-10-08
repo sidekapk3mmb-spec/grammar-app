@@ -944,24 +944,25 @@ function UnitContainer({ data, setData, bookmarks, setBookmarks, progress, setPr
 
 function MicroLearnBlock({ content }) {
   let formatted = content || "";
-  // Jika teks menumpuk tanpa newline, paksa pisahkan setiap dua kalimat (setelah titik spasi huruf besar)
+  formatted = formatted.replace(/\s*\((\d+|[a-c])\)\s*/g, '\n\n• ');
+  
   if (!formatted.includes('\n\n') && formatted.length > 200) {
      formatted = formatted.replace(/\. ([A-Z])/g, '.\n\n$1');
   }
   
   const blocks = formatted.split('\n\n').filter(s => s.trim());
-  const [visibleCount, setVisibleCount] = useState(2);
+  const [visibleCount, setVisibleCount] = useState(3);
   
   return (
-    <div className="micro-learning-container">
+    <div className="micro-learning-container" style={{ fontSize: '1.1rem', lineHeight: '1.9', color: 'var(--text)' }}>
       {blocks.slice(0, visibleCount).map((b, i) => (
-        <motion.p initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} key={i} className="summary-text" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8", marginBottom: "1.2rem", fontSize: "1.05rem", color: "var(--text)" }}>
+        <motion.p initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} key={i} className="summary-text" style={{ whiteSpace: "pre-wrap", marginBottom: "1.5rem", paddingLeft: b.startsWith('•') ? '1.5rem' : '0', textIndent: b.startsWith('•') ? '-1.5rem' : '0' }}>
           <RichText text={b} />
         </motion.p>
       ))}
       {visibleCount < blocks.length && (
-        <button className="btn btn-outline mb-4" onClick={() => setVisibleCount(v => v + 2)} style={{width: '100%', borderColor: 'var(--accent-light)', color: 'var(--accent)'}}>
-          Continue Reading <ChevronDown size={16} />
+        <button className="btn btn-outline mb-4" onClick={() => setVisibleCount(v => v + 3)} style={{width: '100%', borderColor: 'var(--accent-light)', color: 'var(--accent)', fontWeight: 600}}>
+          Read More <ChevronDown size={16} />
         </button>
       )}
     </div>
@@ -986,7 +987,7 @@ function LearnTab({ unit }) {
         <div className="pattern-box" style={{ background: 'var(--accent-light)', borderLeft: '4px solid var(--accent)', padding: '1.2rem', borderRadius: 'var(--radius)', margin: '1.5rem 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
           <div className="pattern-label" style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.8rem', letterSpacing: '1px' }}>GRAMMAR PATTERN</div>
           <div className="pattern-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {unit.explanation.pattern.split(';').map(s => s.trim()).filter(Boolean).map((line, i) => (
+            {unit.explanation.pattern.replace(/(Negatif:|Tanya:|Positif:|\[\+\]|\[-\]|\[\?\]|Negative:|Question:)/gi, '\n$1').split(/[;\n]/).map(s => s.trim()).filter(Boolean).map((line, i) => (
               <div key={i} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", color: "var(--accent)", fontSize: '0.95rem', background: 'var(--surface)', padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid var(--border)', color: 'var(--text-strong)' }}>
                 <RichText text={line} />
               </div>
@@ -1304,7 +1305,12 @@ function EditTab({ unit, data, setData }) {
 
   return (
     <div className="content-box edit-box">
-      <h3 style={{marginBottom: '1.5rem'}}>General Content</h3>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+        <h3 style={{margin: 0}}>General Content</h3>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{padding: '0.4rem 1rem', fontSize: '0.85rem'}}>
+          <Save size={14} /> {saving ? 'Saving...' : 'Save Section'}
+        </button>
+      </div>
       <div className="input-group">
         <label>Unit Title</label>
         <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
@@ -1382,7 +1388,12 @@ function EditTab({ unit, data, setData }) {
 
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem'}}>
         <div>
-          <h3 style={{marginBottom: '0.25rem'}}>Practice Quiz Builder</h3>
+          <div style={{display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem'}}>
+            <h3 style={{margin: 0}}>Practice Quiz Builder</h3>
+            <button className="btn btn-outline" onClick={handleSave} disabled={saving} style={{padding: '0.2rem 0.75rem', fontSize: '0.8rem', borderColor: 'var(--success)', color: 'var(--success)'}}>
+              <Save size={14} /> Save Quiz
+            </button>
+          </div>
           <p style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>Manage questions for this unit ({questions.length} total)</p>
         </div>
         <div style={{display: 'flex', gap: '0.75rem'}}>
