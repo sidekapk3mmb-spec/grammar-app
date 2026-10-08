@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle, Shuffle } from 'lucide-react';
+import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle, Shuffle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
@@ -102,12 +102,35 @@ function App() {
     }
   };
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   if (!data) return <div className="loading-screen"><div className="spinner"></div>Building Learning Platform...</div>;
 
   return (
     <Router>
       <div className="app-layout">
-        <Sidebar data={data} bookmarks={bookmarks} progress={progress} mistakes={mistakes} />
+        <div className="mobile-header">
+          <div className="mobile-header-brand">
+            <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
+            <span>Grammar Base</span>
+          </div>
+          <button className="btn-icon" onClick={() => setIsSidebarOpen(true)}>
+            <Menu size={24} />
+          </button>
+        </div>
+        
+        {isSidebarOpen && (
+          <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        <Sidebar 
+          data={data} 
+          bookmarks={bookmarks} 
+          progress={progress} 
+          mistakes={mistakes} 
+          isOpen={isSidebarOpen}
+          closeSidebar={() => setIsSidebarOpen(false)}
+        />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Dashboard data={data} progress={progress} bookmarks={bookmarks} mistakes={mistakes} streak={streak} />} />
@@ -125,10 +148,16 @@ function App() {
 
 // --- SIDEBAR ---
 
-function Sidebar({ data, bookmarks, progress, mistakes }) {
+function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSections, setExpandedSections] = useState({});
+
+  useEffect(() => {
+    if (window.innerWidth <= 768 && closeSidebar) {
+      closeSidebar();
+    }
+  }, [location.pathname]);
 
   const sections = useMemo(() => {
     const secs = [];
@@ -150,11 +179,11 @@ function Sidebar({ data, bookmarks, progress, mistakes }) {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
+        <div className="sidebar-brand">
         <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
-        <span>Grammar Base</span>
-      </div>
+      <span>Grammar Base</span>$5</div>$6<button className="btn-icon close-sidebar-btn" onClick={closeSidebar}>$7<XCircle size={20} />$8</button>$9</div>
       
       <div className="sidebar-search">
         <Search size={16} className="search-icon" />
