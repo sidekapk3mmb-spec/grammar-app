@@ -183,7 +183,12 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
       <div className="sidebar-header">
         <div className="sidebar-brand">
         <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
-      <span>Grammar Base</span>$5</div>$6<button className="btn-icon close-sidebar-btn" onClick={closeSidebar}>$7<XCircle size={20} />$8</button>$9</div>
+      <span>Grammar Base</span>
+        </div>
+        <button className="btn-icon close-sidebar-btn" onClick={closeSidebar}>
+          <XCircle size={20} />
+        </button>
+      </div>
       
       <div className="sidebar-search">
         <Search size={16} className="search-icon" />
@@ -1311,10 +1316,67 @@ function EditTab({ unit, data, setData }) {
         <span className="mut" style={{fontSize:'0.8rem'}}>Separate paragraphs with double newlines. Use **bold** for color highlights.</span>
       </div>
       
+      
       <div className="input-group">
         <label>Grammar Pattern</label>
-        <input type="text" value={formData.explanation.pattern} onChange={e => setFormData({...formData, explanation: {...formData.explanation, pattern: e.target.value}})} />
+        <input type="text" value={formData.explanation.pattern || ''} onChange={e => setFormData({...formData, explanation: {...formData.explanation, pattern: e.target.value}})} />
       </div>
+
+      {/* KEY POINTS EDITOR */}
+      <div className="input-group" style={{marginTop: '1.5rem'}}>
+        <label style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          Key Points
+          <button className="btn-icon" onClick={() => setFormData({...formData, explanation: {...formData.explanation, key_points: [...(formData.explanation.key_points || []), 'New key point']}})} title="Add Key Point">
+            <Plus size={16} />
+          </button>
+        </label>
+        {(formData.explanation.key_points || []).map((kp, i) => (
+          <div key={i} style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem'}}>
+            <input type="text" value={kp} onChange={e => {
+              const newKp = [...formData.explanation.key_points];
+              newKp[i] = e.target.value;
+              setFormData({...formData, explanation: {...formData.explanation, key_points: newKp}});
+            }} />
+            <button className="btn-icon" onClick={() => {
+              const newKp = [...formData.explanation.key_points];
+              newKp.splice(i, 1);
+              setFormData({...formData, explanation: {...formData.explanation, key_points: newKp}});
+            }}><XCircle size={16} color="var(--danger)" /></button>
+          </div>
+        ))}
+      </div>
+
+      {/* CONTEXTUAL EXAMPLES EDITOR */}
+      <div className="input-group" style={{marginTop: '1.5rem'}}>
+        <label style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          Contextual Examples
+          <button className="btn-icon" onClick={() => setFormData({...formData, explanation: {...formData.explanation, examples: [...(formData.explanation.examples || []), {en: 'English text', id: 'Indonesian context'}]}})} title="Add Example">
+            <Plus size={16} />
+          </button>
+        </label>
+        {(formData.explanation.examples || []).map((ex, i) => (
+          <div key={i} style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', background: 'var(--bg)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)'}}>
+            <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <input type="text" value={ex.en} placeholder="English Text" onChange={e => {
+                const newEx = [...formData.explanation.examples];
+                newEx[i].en = e.target.value;
+                setFormData({...formData, explanation: {...formData.explanation, examples: newEx}});
+              }} />
+              <input type="text" value={ex.id || ''} placeholder="Indonesian Context/Translation" onChange={e => {
+                const newEx = [...formData.explanation.examples];
+                newEx[i].id = e.target.value;
+                setFormData({...formData, explanation: {...formData.explanation, examples: newEx}});
+              }} />
+            </div>
+            <button className="btn-icon" style={{alignSelf: 'flex-start'}} onClick={() => {
+              const newEx = [...formData.explanation.examples];
+              newEx.splice(i, 1);
+              setFormData({...formData, explanation: {...formData.explanation, examples: newEx}});
+            }}><Trash2 size={16} color="var(--danger)" /></button>
+          </div>
+        ))}
+      </div>
+
       
       <div className="divider" style={{margin: '3rem 0', borderTop: '1px solid var(--border)'}}></div>
 
