@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle } from 'lucide-react';
+import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle, Shuffle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
@@ -88,7 +88,7 @@ function App() {
       setStreak(0); // Lost streak
     }
 
-    fetch(import.meta.env.VITE_API_URL || 'http://localhost:3001/api/units')
+    fetch('/api/units')
       .then(res => res.json())
       .then(d => setData(d))
       .catch(e => console.error(e));
@@ -114,6 +114,7 @@ function App() {
             <Route path="/unit/:id" element={<UnitContainer data={data} setData={setData} bookmarks={bookmarks} setBookmarks={setBookmarks} progress={progress} setProgress={setProgress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
             <Route path="/drill" element={<MistakeDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
             <Route path="/daily" element={<DailyQuiz data={data} progress={progress} recordActivity={recordActivity} />} />
+            <Route path="/mixed" element={<MixedDrill data={data} progress={progress} recordActivity={recordActivity} />} />
             <Route path="/vocab" element={<VocabDrill recordActivity={recordActivity} />} />
           </Routes>
         </main>
@@ -169,6 +170,9 @@ function Sidebar({ data, bookmarks, progress, mistakes }) {
         <div className="sidebar-section">
           <Link to="/" className={`sidebar-link ${location.pathname === '/' ? 'active' : ''}`}>
             <Layout size={16} /> Dashboard
+          </Link>
+          <Link to="/mixed" className={`sidebar-link ${location.pathname === '/mixed' ? 'active' : ''}`}>
+            <Shuffle size={16} /> Mixed Review
           </Link>
           <Link to="/daily" className={`sidebar-link ${location.pathname === '/daily' ? 'active' : ''}`}>
             <Zap size={16} /> Daily Mix Quiz
@@ -321,7 +325,10 @@ function Dashboard({ data, progress, bookmarks, mistakes, streak }) {
           <Zap size={48} className="text-accent" style={{marginBottom: '1rem'}} />
           <h3>Daily Mix Quiz</h3>
           <p className="text-muted mb-4">5 quick questions to keep your grammar sharp and maintain your streak!</p>
-          <Link to="/daily" className="btn btn-primary" style={{width: '100%'}}>Start 5-Min Drill</Link>
+          <div style={{display: 'flex', gap: '0.5rem', width: '100%'}}>
+            <Link to="/daily" className="btn btn-primary" style={{flex: 1}}>5-Min Drill</Link>
+            <Link to="/mixed" className="btn btn-outline" style={{flex: 1, borderColor: 'var(--accent)', color: 'var(--accent)'}}>Mixed Review</Link>
+          </div>
         </div>
       </div>
 
@@ -482,6 +489,195 @@ function DailyQuiz({ data, progress, recordActivity }) {
     </div>
   );
 }
+
+
+// --- MIXED REVIEW DRILL ---
+
+function MixedDrill({ data, progress, recordActivity }) {
+  const [questions, setQuestions] = useState([]);
+  const [qIndex, setQIndex] = useState(0);
+  const [feedback, setFeedback] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+  const [reorderSelected, setReorderSelected] = useState([]);
+  const [score, setScore] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [setupMode, setSetupMode] = useState(true);
+  const [selectedSections, setSelectedSections] = useState([]);
+  const navigate = useNavigate();
+
+  const sections = Array.from(new Set(data.units.map(u => u.section.title)));
+
+  const toggleSection = (sec) => {
+    if (selectedSections.includes(sec)) setSelectedSections(selectedSections.filter(s => s !== sec));
+    else setSelectedSections([...selectedSections, sec]);
+  };
+
+  const startDrill = () => {
+    let pool = [];
+    data.units.forEach(u => {
+      if (selectedSections.length === 0 || selectedSections.includes(u.section.title)) {
+        if (u.practice && u.practice.questions) pool.push(...u.practice.questions.map(q => ({...q, unitTitle: u.title})));
+      }
+    });
+    const shuffled = pool.sort(() => 0.5 - Math.random()).slice(0, 10);
+    setQuestions(shuffled);
+    setSetupMode(false);
+  };
+
+  if (setupMode) {
+    return (
+      <div className="content-box" style={{maxWidth: '600px', margin: '2rem auto'}}>
+        <h2 style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Shuffle size={24} className="text-accent" /> Custom Mixed Review</h2>
+        <p className="text-muted mb-4">Select the topics you want to review. We'll generate a 10-question mixed quiz.</p>
+        <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem'}}>
+          {sections.map((sec, i) => (
+            <label key={i} style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', cursor: 'pointer', background: selectedSections.includes(sec) ? 'var(--accent-bg)' : 'transparent'}}>
+              <input type="checkbox" checked={selectedSections.includes(sec)} onChange={() => toggleSection(sec)} />
+              <span style={{fontWeight: selectedSections.includes(sec) ? 600 : 400}}>{sec}</span>
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-primary w-100" onClick={startDrill}>Start Mixed Drill</button>
+      </div>
+    );
+  }
+
+  if (showResult) {
+    return (
+      <div className="content-box result-screen" style={{maxWidth: '600px', margin: '2rem auto', textAlign: 'center', padding: '3rem 1rem'}}>
+        <CheckCircle2 size={64} className="text-success mx-auto" />
+        <h2 style={{marginTop: '1rem'}}>Review Complete!</h2>
+        <p>You scored <strong>{score}</strong> out of {questions.length}</p>
+        <button className="btn btn-primary mt-4" onClick={() => { setSetupMode(true); setQIndex(0); setScore(0); setShowResult(false); }}>New Mixed Drill</button>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) return <div className="content-box">No questions found for the selected topics.</div>;
+
+  const q = questions[qIndex];
+
+  const handleAnswer = (isCorrect, correctAns) => {
+    if (feedback) return;
+    if (isCorrect) setScore(s => s + 1);
+    setFeedback({ isCorrect, explanation: q.explanation, correctAns });
+  };
+
+  const handleReorderCheck = () => {
+    if (feedback || !q.words || reorderSelected.length !== q.words.length) return;
+    const answerStr = reorderSelected.join(' ');
+    const isCorrect = q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(answerStr));
+    handleAnswer(isCorrect, q.accepted_answers[0]);
+  };
+
+  const nextQuestion = () => {
+    setFeedback(null);
+    setInputValue('');
+    setReorderSelected([]);
+    if (qIndex < questions.length - 1) {
+      setQIndex(prev => prev + 1);
+    } else {
+      if (recordActivity) recordActivity();
+      setShowResult(true);
+    }
+  };
+
+  return (
+    <div className="content-box quiz-box" style={{maxWidth: '600px', margin: '2rem auto'}}>
+      <div className="quiz-progress-text" style={{display: 'flex', justifyContent: 'space-between'}}>
+        <span>Mixed Review: {qIndex + 1} of {questions.length}</span>
+        <span className="badge">{q.unitTitle}</span>
+      </div>
+      <div className="quiz-progress-bar"><div className="quiz-progress-fill" style={{width: `${(qIndex / questions.length) * 100}%`}}></div></div>
+      
+      <h3 className="quiz-prompt"><RichText text={q.prompt} /></h3>
+      
+      {q.type === 'multiple_choice' && (
+        <div className="options-grid">
+          {q.options && q.options.map((opt, idx) => (
+             <button key={idx} className={`quiz-option ${feedback ? (idx === q.answer_index ? 'correct' : (idx !== q.answer_index && !feedback.isCorrect ? 'disabled' : '')) : ''}`} onClick={() => handleAnswer(idx === q.answer_index, q.options[q.answer_index])}>
+               <RichText text={opt} />
+             </button>
+          ))}
+        </div>
+      )}
+
+      {(q.type === 'fill_blank' || q.type === 'error_correction' || q.type === 'transformation') && (
+        <div className="fill-blank-container">
+          <input type="text" className="fill-input" placeholder="Type answer..." disabled={feedback !== null} value={inputValue} onChange={e => setInputValue(e.target.value)} onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleAnswer(q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0]);
+            }
+          }} />
+          {!feedback && <button className="btn btn-primary mt-3" onClick={() => handleAnswer(q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0])}>Check</button>}
+        </div>
+      )}
+
+      {q.type === 'reorder' && (
+        <div className="reorder-container">
+          <div className="reorder-dropzone" style={{minHeight: '50px', padding: '1rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+            {reorderSelected.length === 0 && <span style={{color: 'var(--text-muted)'}}>Select words below...</span>}
+            {reorderSelected.map((w, i) => (
+              <span key={i} className="badge" style={{fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: 'var(--accent)', color: 'white'}} onClick={() => { if(!feedback) { const n = [...reorderSelected]; n.splice(i,1); setReorderSelected(n); } }}>{w}</span>
+            ))}
+          </div>
+          <div className="reorder-words" style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem'}}>
+            {q.words && q.words.map((w, i) => {
+               const selectedCount = reorderSelected.filter(sw => sw === w).length;
+               const totalCount = q.words.filter(tw => tw === w).length;
+               const disabled = selectedCount >= totalCount || feedback !== null;
+               return (
+                 <button key={i} className="btn btn-outline" style={{padding: '0.5rem 1rem', opacity: disabled ? 0.5 : 1}} disabled={disabled} onClick={() => { if(!feedback) setReorderSelected([...reorderSelected, w]); }}>{w}</button>
+               );
+            })}
+          </div>
+          {!feedback && q.words && reorderSelected.length === q.words.length && (
+            <button className="btn btn-primary" onClick={handleReorderCheck}>Check Answer</button>
+          )}
+        </div>
+      )}
+
+      {q.type === 'reorder' && (
+        <div className="reorder-container">
+          <div className="reorder-dropzone" style={{minHeight: '50px', padding: '1rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+            {reorderSelected.length === 0 && <span style={{color: 'var(--text-muted)'}}>Select words below...</span>}
+            {reorderSelected.map((w, i) => (
+              <span key={i} className="badge" style={{fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: 'var(--accent)', color: 'white'}} onClick={() => { if(!feedback) { const n = [...reorderSelected]; n.splice(i,1); setReorderSelected(n); } }}>{w}</span>
+            ))}
+          </div>
+          <div className="reorder-words" style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem'}}>
+            {q.words && q.words.map((w, i) => {
+               const selectedCount = reorderSelected.filter(sw => sw === w).length;
+               const totalCount = q.words.filter(tw => tw === w).length;
+               const disabled = selectedCount >= totalCount || feedback !== null;
+               return (
+                 <button key={i} className="btn btn-outline" style={{padding: '0.5rem 1rem', opacity: disabled ? 0.5 : 1}} disabled={disabled} onClick={() => { if(!feedback) setReorderSelected([...reorderSelected, w]); }}>{w}</button>
+               );
+            })}
+          </div>
+          {!feedback && q.words && reorderSelected.length === q.words.length && (
+            <button className="btn btn-primary" onClick={handleReorderCheck}>Check Answer</button>
+          )}
+        </div>
+      )}
+
+      {feedback && (
+        <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className={`feedback-box ${feedback.isCorrect ? 'correct' : 'incorrect'}`}>
+          <div className="feedback-header">
+            {feedback.isCorrect ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+            <h4>{feedback.isCorrect ? 'Correct!' : 'Incorrect.'}</h4>
+          </div>
+          {!feedback.isCorrect && <div className="correct-answer-show"><strong>Correct:</strong> <RichText text={feedback.correctAns} /></div>}
+          {feedback.explanation && <p className="feedback-exp"><RichText text={feedback.explanation} /></p>}
+          <button className="btn btn-primary mt-3" onClick={nextQuestion} autoFocus>
+            {qIndex < questions.length - 1 ? 'Next Question' : 'Finish Drill'} <ArrowRight size={16} />
+          </button>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 
 // --- VOCAB DRILL (50 WORDS) ---
 
@@ -713,18 +909,24 @@ function UnitContainer({ data, setData, bookmarks, setBookmarks, progress, setPr
 }
 
 function MicroLearnBlock({ content }) {
-  const blocks = content.split('\n\n').filter(s => s.trim());
-  const [visibleCount, setVisibleCount] = useState(1);
+  let formatted = content || "";
+  // Jika teks menumpuk tanpa newline, paksa pisahkan setiap dua kalimat (setelah titik spasi huruf besar)
+  if (!formatted.includes('\n\n') && formatted.length > 200) {
+     formatted = formatted.replace(/\. ([A-Z])/g, '.\n\n$1');
+  }
+  
+  const blocks = formatted.split('\n\n').filter(s => s.trim());
+  const [visibleCount, setVisibleCount] = useState(2);
   
   return (
     <div className="micro-learning-container">
       {blocks.slice(0, visibleCount).map((b, i) => (
-        <motion.p initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} key={i} className="summary-text">
+        <motion.p initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} key={i} className="summary-text" style={{ whiteSpace: "pre-wrap", lineHeight: "1.8", marginBottom: "1.2rem", fontSize: "1.05rem", color: "var(--text)" }}>
           <RichText text={b} />
         </motion.p>
       ))}
       {visibleCount < blocks.length && (
-        <button className="btn btn-outline mb-4" onClick={() => setVisibleCount(v => v + 1)} style={{width: '100%', borderColor: 'var(--accent-light)', color: 'var(--accent)'}}>
+        <button className="btn btn-outline mb-4" onClick={() => setVisibleCount(v => v + 2)} style={{width: '100%', borderColor: 'var(--accent-light)', color: 'var(--accent)'}}>
           Continue Reading <ChevronDown size={16} />
         </button>
       )}
@@ -747,9 +949,15 @@ function LearnTab({ unit }) {
       <MicroLearnBlock content={unit.explanation.summary} />
       
       {unit.explanation.pattern && (
-        <div className="pattern-box">
-          <div className="pattern-label">GRAMMAR PATTERN</div>
-          <div className="pattern-content"><RichText text={unit.explanation.pattern} /></div>
+        <div className="pattern-box" style={{ background: 'var(--accent-light)', borderLeft: '4px solid var(--accent)', padding: '1.2rem', borderRadius: 'var(--radius)', margin: '1.5rem 0', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+          <div className="pattern-label" style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.8rem', letterSpacing: '1px' }}>GRAMMAR PATTERN</div>
+          <div className="pattern-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {unit.explanation.pattern.split(';').map(s => s.trim()).filter(Boolean).map((line, i) => (
+              <div key={i} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", color: "var(--accent)", fontSize: '0.95rem', background: 'var(--surface)', padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid var(--border)', color: 'var(--text-strong)' }}>
+                <RichText text={line} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -834,6 +1042,30 @@ function PracticeTab({ unit, setProgress, progress, mistakes, setMistakes, recor
     setFeedback({ isCorrect, explanation: q.explanation, correctAns: q.options[q.answer_index] });
   };
 
+
+  const handleReorderSelect = (word) => {
+    if (feedback) return;
+    setReorderSelected([...reorderSelected, word]);
+  };
+
+  const handleReorderDeselect = (idx) => {
+    if (feedback) return;
+    const newSel = [...reorderSelected];
+    newSel.splice(idx, 1);
+    setReorderSelected(newSel);
+  };
+
+  const handleReorderCheck = () => {
+    if (feedback || reorderSelected.length !== q.words.length) return;
+    const answerStr = reorderSelected.join(' ');
+    const isCorrect = q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(answerStr));
+    
+    if (isCorrect) setScore(s => s + 1);
+    else handleIncorrect();
+    
+    setFeedback({ isCorrect, explanation: q.explanation, correctAns: q.accepted_answers[0] });
+  };
+
   const handleFillBlank = () => {
     if (feedback || !inputValue.trim()) return;
     const normalizedInput = normalizeText(inputValue);
@@ -887,7 +1119,7 @@ function PracticeTab({ unit, setProgress, progress, mistakes, setMistakes, recor
         </div>
       )}
 
-      {q.type === 'fill_blank' && (
+      {(q.type === 'fill_blank' || q.type === 'error_correction' || q.type === 'transformation') && (
         <div className="fill-blank-container">
           <input 
             type="text" 
@@ -901,6 +1133,30 @@ function PracticeTab({ unit, setProgress, progress, mistakes, setMistakes, recor
           />
           {!feedback && (
             <button className="btn btn-primary mt-3" onClick={handleFillBlank}>Check Answer</button>
+          )}
+        </div>
+      )}
+
+      {q.type === 'reorder' && (
+        <div className="reorder-container">
+          <div className="reorder-dropzone" style={{minHeight: '50px', padding: '1rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+            {reorderSelected.length === 0 && <span style={{color: 'var(--text-muted)'}}>Select words below...</span>}
+            {reorderSelected.map((w, i) => (
+              <span key={i} className="badge" style={{fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: 'var(--accent)', color: 'white'}} onClick={() => { if(!feedback) { const n = [...reorderSelected]; n.splice(i,1); setReorderSelected(n); } }}>{w}</span>
+            ))}
+          </div>
+          <div className="reorder-words" style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem'}}>
+            {q.words && q.words.map((w, i) => {
+               const selectedCount = reorderSelected.filter(sw => sw === w).length;
+               const totalCount = q.words.filter(tw => tw === w).length;
+               const disabled = selectedCount >= totalCount || feedback !== null;
+               return (
+                 <button key={i} className="btn btn-outline" style={{padding: '0.5rem 1rem', opacity: disabled ? 0.5 : 1}} disabled={disabled} onClick={() => { if(!feedback) setReorderSelected([...reorderSelected, w]); }}>{w}</button>
+               );
+            })}
+          </div>
+          {!feedback && q.words && reorderSelected.length === q.words.length && (
+            <button className="btn btn-primary" onClick={handleReorderCheck}>Check Answer</button>
           )}
         </div>
       )}
@@ -942,7 +1198,7 @@ function EditTab({ unit, data, setData }) {
     const newData = { ...data, units: data.units.map(u => u.unit === unit.unit ? formData : u) };
     
     try {
-      const res = await fetch(import.meta.env.VITE_API_URL || 'http://localhost:3001/api/units', {
+      const res = await fetch('/api/units', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newData)
@@ -1058,7 +1314,7 @@ function EditTab({ unit, data, setData }) {
         {questions.map((q, qIndex) => (
           <div key={qIndex} className="q-edit-card" style={{border: '1px solid var(--border)', padding: '1.5rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)'}}>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)'}}>
-              <span className="badge">{q.type === 'multiple_choice' ? 'Multiple Choice' : 'Fill in the Blank'}</span>
+              <span className="badge" style={{textTransform:'capitalize'}}>{q.type.replace('_', ' ')}</span>
               <button className="btn-icon" style={{color: 'var(--danger)'}} onClick={() => removeQuestion(qIndex)} title="Delete Question">
                 <Trash2 size={18} />
               </button>
