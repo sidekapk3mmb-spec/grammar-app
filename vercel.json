@@ -5,9 +5,16 @@
   "functions": {
     "api/units.js": {
       "includeFiles": "grammar-units.json"
+    },
+    "api/data.js": {
+      "includeFiles": "web/src/*.json"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/data/:type",
+      "destination": "/api/data?type=:type"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"

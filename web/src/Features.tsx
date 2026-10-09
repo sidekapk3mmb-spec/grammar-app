@@ -9,8 +9,16 @@ function useFeatureData(type) {
   useEffect(() => {
     fetch('/api/data/' + type)
       .then(res => res.json())
-      .then(json => { setData(json); setLoading(false); })
-      .catch(e => { console.error(e); setLoading(false); });
+      .then(json => { 
+        if (Array.isArray(json)) {
+          setData(json);
+        } else {
+          console.error("API returned non-array:", json);
+          setData([]);
+        }
+        setLoading(false); 
+      })
+      .catch(e => { console.error(e); setLoading(false); setData([]); });
   }, [type]);
 
   const saveData = async (newData) => {
