@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, Fragment } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle, Shuffle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { PodcastListening, ShadowingDrill, WritingAnalyzer, DictationDrill } from './Features';
+import { VocabEngine } from './VocabEngine';
 import './App.css';
 
 // --- UTILITIES & HOOKS ---
@@ -46,6 +48,7 @@ const DICTIONARY = {
 };
 
 import vocabData from './vocab.json';
+import ieltsVocabData from './ielts_vocab.json';
 
 function RichText({ text }) {
   if (!text) return null;
@@ -73,12 +76,20 @@ function App() {
   const [data, setData] = useState(null);
   const [bookmarks, setBookmarks] = useLocalStorage('grammar_bookmarks', []);
   const [progress, setProgress] = useLocalStorage('grammar_progress', {}); // { unitId: score }
-  const [mistakes, setMistakes] = useLocalStorage('grammar_mistakes', []); // Array of mistaken questions
+  const [mistakes, setMistakes] = useLocalStorage('grammar_mistakes', []); // Error log
+  const [vocab, setVocab] = useLocalStorage('grammar_vocab', []); // Personal vocab book
   const [lastActive, setLastActive] = useLocalStorage('grammar_last_active', null);
   const [streak, setStreak] = useLocalStorage('grammar_streak', 0);
+  
+  // Daily Tasks state
+  const [dailyTasks, setDailyTasks] = useLocalStorage('grammar_daily_tasks', [
+    { id: 'mix', title: 'Daily Mix Quiz', done: false },
+    { id: 'vocab', title: 'Review 20 Vocab', done: false },
+    { id: 'dictation', title: '1 Dictation Exercise', done: false }
+  ]);
 
   useEffect(() => {
-    // Check Streak Expiry
+    // Check Streak & Tasks Expiry
     const todayStr = new Date().toDateString();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -92,13 +103,19 @@ function App() {
       .then(res => res.json())
       .then(d => setData(d))
       .catch(e => console.error(e));
-  }, []);
+  }, [lastActive, setStreak]);
 
   const recordActivity = () => {
-    const today = new Date().toDateString();
-    if (lastActive !== today) {
-      setStreak(s => s + 1);
-      setLastActive(today);
+    if (lastActive !== todayStr) {
+      if (lastActive === yesterdayStr) {
+        setStreak(s => s + 1);
+      } else if (lastActive !== null) {
+        setStreak(1);
+      } else {
+        setStreak(1);
+      }
+      setLastActive(todayStr);
+      setDailyTasks(tasks => tasks.map(t => ({...t, done: false}))); // Reset tasks daily
     }
   };
 
@@ -133,17 +150,27 @@ function App() {
         />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Dashboard data={data} progress={progress} bookmarks={bookmarks} mistakes={mistakes} streak={streak} />} />
+            <Route path="/" element={<Dashboard data={data} progress={progress} bookmarks={bookmarks} mistakes={mistakes} streak={streak} dailyTasks={dailyTasks} setDailyTasks={setDailyTasks} />} />
             <Route path="/unit/:id" element={<UnitContainer data={data} setData={setData} bookmarks={bookmarks} setBookmarks={setBookmarks} progress={progress} setProgress={setProgress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
             <Route path="/drill" element={<MistakeDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
-            <Route path="/daily" element={<DailyQuiz data={data} progress={progress} recordActivity={recordActivity} />} />
+            <Route path="/daily" element={<DailyQuiz data={data} progress={progress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
+              recordActivity();
+              setDailyTasks(tasks => tasks.map(t => t.id === 'mix' ? {...t, done: true} : t));
+            }} />} />
             <Route path="/mixed" element={<MixedDrill data={data} progress={progress} recordActivity={recordActivity} />} />
-            <Route path="/vocab" element={<VocabDrill recordActivity={recordActivity} />} />
-            <Route path="/ielts" element={<IeltsDrill recordActivity={recordActivity} />} />
+            <Route path="/vocab" element={<VocabEngine deckName="daily" title="Daily Vocab" initialData={vocabData} recordActivity={() => {
+              recordActivity();
+              setDailyTasks(tasks => tasks.map(t => t.id === 'vocab' ? {...t, done: true} : t));
+            }} />} />
+            <Route path="/ielts" element={<VocabEngine deckName="ielts" title="IELTS Vocab" initialData={ieltsVocabData} recordActivity={recordActivity} />} />
             <Route path="/writing" element={<WritingAnalyzer />} />
-            <Route path="/dictation" element={<DictationDrill recordActivity={recordActivity} />} />
+            <Route path="/dictation" element={<DictationDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
+              recordActivity();
+              setDailyTasks(tasks => tasks.map(t => t.id === 'dictation' ? {...t, done: true} : t));
+            }} />} />
             <Route path="/shadowing" element={<ShadowingDrill />} />
             <Route path="/podcast" element={<PodcastListening />} />
+            <Route path="/error-log" element={<ErrorLog mistakes={mistakes} setMistakes={setMistakes} />} />
                       </Routes>
         </main>
       </div>
@@ -162,7 +189,7 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
     if (window.innerWidth <= 768 && closeSidebar) {
       closeSidebar();
     }
-  }, [location.pathname]);
+  }, [location.pathname, closeSidebar]);
 
   const sections = useMemo(() => {
     const secs = [];
@@ -265,7 +292,7 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
 
 // --- DASHBOARD ---
 
-function Dashboard({ data, progress, bookmarks, mistakes, streak }) {
+function Dashboard({ data, progress, bookmarks, mistakes, streak, dailyTasks, setDailyTasks }) {
   const totalUnits = data.units.length;
   const completedCount = Object.keys(progress).length;
   const completionPct = Math.round((completedCount / totalUnits) * 100) || 0;
@@ -353,61 +380,63 @@ function Dashboard({ data, progress, bookmarks, mistakes, streak }) {
         </div>
       </div>
 
-      <div className="dashboard-section mt-4" style={{display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '2rem'}}>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: 'var(--accent-bg)', border: '1px solid var(--accent)', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: 'var(--accent)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Calendar size={18}/> Daily Vocab</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>20 Words</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Swipe through 20 essential vocabulary words every day to enrich your grammar.</p>
-          <Link to="/vocab" className="btn btn-outline" style={{width: '100%', borderColor: 'var(--accent)', color: 'var(--accent)', textAlign: 'center'}}>Start Vocab Drill</Link>
+      <div className="dashboard-section mt-4">
+        <h2>Target Hari Ini</h2>
+        <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden'}}>
+          {dailyTasks.map(task => (
+            <div key={task.id} style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                <div style={{width: '24px', height: '24px', borderRadius: '50%', border: task.done ? 'none' : '2px solid var(--border)', background: task.done ? 'var(--success)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'}}>
+                  {task.done && <CheckCircle2 size={16} />}
+                </div>
+                <span style={{fontSize: '1.1rem', textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--text-muted)' : 'var(--text-strong)'}}>{task.title}</span>
+              </div>
+              {!task.done && (
+                <Link to={task.id === 'mix' ? '/daily' : task.id === 'vocab' ? '/vocab' : '/dictation'} className="btn btn-outline" style={{padding: '0.4rem 1rem'}}>Mulai</Link>
+              )}
+            </div>
+          ))}
         </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: '#f0fdf4', border: '1px solid #22c55e', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: '#16a34a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Flame size={18}/> IELTS Vocab</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>20 Phrases</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Phrasal Verbs, Collocations, Idioms (Environment, Tech, dll).</p>
-          <Link to="/ielts" className="btn btn-outline" style={{width: '100%', borderColor: '#16a34a', color: '#16a34a', textAlign: 'center'}}>Mulai IELTS Vocab</Link>
-        </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: '#eff6ff', border: '1px solid #3b82f6', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: '#2563eb', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Edit3 size={18}/> Writing Analyzer</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>Band 8.0+</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Bedah struktur dan kosakata esai IELTS berstandar tinggi.</p>
-          <Link to="/writing" className="btn btn-outline" style={{width: '100%', borderColor: '#2563eb', color: '#2563eb', textAlign: 'center'}}>Bedah Esai</Link>
-        </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: '#fdf4ff', border: '1px solid #d946ef', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: '#c026d3', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Zap size={18}/> Daily Dictation</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>Listen & Type</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Latih pendengaran dan ejaan dengan kalimat Bahasa Inggris.</p>
-          <Link to="/dictation" className="btn btn-outline" style={{width: '100%', borderColor: '#c026d3', color: '#c026d3', textAlign: 'center'}}>Mulai Dictation</Link>
-        </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: '#fff1f2', border: '1px solid #f43f5e', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: '#e11d48', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><PlayCircle size={18}/> Podcast Listening</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>TED & CEO</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Latih listening dengan video TED Talks dan Diary of a CEO.</p>
-          <Link to="/podcast" className="btn btn-outline" style={{width: '100%', borderColor: '#e11d48', color: '#e11d48', textAlign: 'center'}}>Dengarkan</Link>
-        </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', background: '#fefce8', border: '1px solid #eab308', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-          <h3 style={{color: '#ca8a04', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}><PlayCircle size={18}/> Shadowing</h3>
-          <h2 style={{fontSize: '1.8rem', marginBottom: '0.2rem'}}>Speaking</h2>
-          <p className="text-muted" style={{fontStyle: 'italic', marginBottom: '1.5rem'}}>Latih pelafalan IELTS Speaking dengan metode Shadowing.</p>
-          <Link to="/shadowing" className="btn btn-outline" style={{width: '100%', borderColor: '#ca8a04', color: '#ca8a04', textAlign: 'center'}}>Mulai Shadowing</Link>
-        </div>
-
-        <div className="content-box" style={{flex: 1, minWidth: '280px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center'}}>
-          <Zap size={48} className="text-accent" style={{marginBottom: '1rem'}} />
-          <h3>Daily Mix Quiz</h3>
-          <p className="text-muted mb-4">5 quick questions to keep your grammar sharp and maintain your streak!</p>
-          <div style={{display: 'flex', gap: '0.5rem', width: '100%'}}>
-            <Link to="/daily" className="btn btn-primary" style={{flex: 1}}>5-Min Drill</Link>
-            <Link to="/mixed" className="btn btn-outline" style={{flex: 1, borderColor: 'var(--accent)', color: 'var(--accent)'}}>Mixed Review</Link>
-          </div>
-        </div>
-
       </div>
+
+      <div className="dashboard-section mt-5">
+        <h2 style={{fontSize: '1.2rem', color: 'var(--text-muted)'}}>Fitur Latihan Tambahan</h2>
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem'}}>
+          
+          <Link to="/mixed" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem'}}>
+            <Shuffle size={20} className="text-accent" />
+            <span style={{fontWeight: 500}}>Mixed Review</span>
+          </Link>
+
+          <Link to="/ielts" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem'}}>
+            <Flame size={20} style={{color: '#16a34a'}} />
+            <span style={{fontWeight: 500}}>IELTS Vocab</span>
+          </Link>
+
+          <Link to="/writing" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem'}}>
+            <Edit3 size={20} style={{color: '#2563eb'}} />
+            <span style={{fontWeight: 500}}>Writing Analyzer</span>
+          </Link>
+
+          <Link to="/podcast" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem'}}>
+            <PlayCircle size={20} style={{color: '#e11d48'}} />
+            <span style={{fontWeight: 500}}>Podcast Listening</span>
+          </Link>
+
+          <Link to="/shadowing" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem'}}>
+            <PlayCircle size={20} style={{color: '#ca8a04'}} />
+            <span style={{fontWeight: 500}}>Shadowing Speaking</span>
+          </Link>
+
+          <Link to="/error-log" className="content-box" style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', borderColor: mistakes.length > 0 ? 'var(--danger)' : 'var(--border)'}}>
+            <AlertTriangle size={20} style={{color: mistakes.length > 0 ? 'var(--danger)' : 'var(--text-muted)'}} />
+            <span style={{fontWeight: 500}}>Error Log</span>
+            {mistakes.length > 0 && <span className="badge" style={{background: 'var(--danger-bg)', color: 'var(--danger)', marginLeft: 'auto'}}>{mistakes.length}</span>}
+          </Link>
+          
+        </div>
+      </div>
+
 
       {weakestUnits.length > 0 && (
         <div className="dashboard-section mt-4">
@@ -461,29 +490,48 @@ function Dashboard({ data, progress, bookmarks, mistakes, streak }) {
 
 // --- DAILY MIX QUIZ ---
 
-function DailyQuiz({ data, progress, recordActivity }) {
-  const [questions, setQuestions] = useState([]);
+function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
   const [qIndex, setQIndex] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const completedUnits = Object.keys(progress).map(Number);
-    let pool = [];
-    if (completedUnits.length > 0) {
-      data.units.filter(u => completedUnits.includes(u.unit)).forEach(u => {
-        if(u.practice && u.practice.questions) pool.push(...u.practice.questions);
+  const questions = useMemo(() => {
+    let pool = [...mistakes].sort(() => 0.5 - Math.random());
+    
+    if (pool.length < 5) {
+      const weakestUnits = [...data.units].map(u => ({
+          unitId: u.unit, 
+          mistakeCount: mistakes.filter((m: any) => m.unitId === u.unit).length
+      })).sort((a,b) => b.mistakeCount - a.mistakeCount).slice(0, 3);
+      
+      let fillerPool: any[] = [];
+      weakestUnits.forEach(wu => {
+          const u = data.units.find((x: any) => x.unit === wu.unitId);
+          if(u && u.practice && u.practice.questions) fillerPool.push(...u.practice.questions);
       });
-    } else {
-      data.units.slice(0, 3).forEach(u => {
-        if(u.practice && u.practice.questions) pool.push(...u.practice.questions);
-      });
+      
+      if (fillerPool.length === 0) {
+          const completedUnits = Object.keys(progress).map(Number);
+          if (completedUnits.length > 0) {
+              data.units.filter((u: any) => completedUnits.includes(u.unit)).forEach((u: any) => {
+                  if(u.practice && u.practice.questions) fillerPool.push(...u.practice.questions);
+              });
+          } else {
+              data.units.slice(0, 3).forEach((u: any) => {
+                  if(u.practice && u.practice.questions) fillerPool.push(...u.practice.questions);
+              });
+          }
+      }
+
+      fillerPool = fillerPool.filter(fq => !pool.some(pq => pq.prompt === fq.prompt));
+      fillerPool.sort(() => 0.5 - Math.random());
+      pool = [...pool, ...fillerPool.slice(0, 5 - pool.length)];
     }
-    const shuffled = pool.sort(() => 0.5 - Math.random()).slice(0, 5);
-    setQuestions(shuffled);
-  }, [data, progress]);
+
+    return pool.slice(0, 5).sort(() => 0.5 - Math.random());
+  }, [data, progress, mistakes]);
 
   if (!questions) return <div className="loading-screen"><div className="spinner"></div>Loading Quiz...</div>;
   if (questions.length === 0) return (
@@ -510,9 +558,23 @@ function DailyQuiz({ data, progress, recordActivity }) {
 
   const q = questions[qIndex];
   
-  const handleAnswer = (isCorrect, correctAns) => {
+  const handleAnswer = (isCorrect: boolean, correctAns: string) => {
     if (feedback) return;
-    if (isCorrect) setScore(s => s + 1);
+    
+    if (isCorrect) {
+      setScore(s => s + 1);
+      const newMistakes = mistakes.filter((m: any) => m.prompt !== q.prompt);
+      if (newMistakes.length !== mistakes.length) {
+          setMistakes(newMistakes);
+      }
+    } else {
+      const isAlreadyInMistakes = mistakes.some((m: any) => m.prompt === q.prompt);
+      if (!isAlreadyInMistakes) {
+          const unitIdToSave = q.unitId || data.units.find((u: any) => u.practice && u.practice.questions && u.practice.questions.some((pq: any) => pq.prompt === q.prompt))?.unit;
+          setMistakes([...mistakes, { unitId: unitIdToSave, ...q }]);
+      }
+    }
+    
     setFeedback({ isCorrect, explanation: q.explanation, correctAns });
   };
 
@@ -756,80 +818,89 @@ function MixedDrill({ data, progress, recordActivity }) {
 }
 
 
-// --- VOCAB DRILL (20 WORDS) ---
+// --- ERROR LOG ---
 
-function VocabDrill({ recordActivity }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
+function ErrorLog({ mistakes, setMistakes }) {
   const navigate = useNavigate();
-  
-  // Shuffle words for the session
-  const words = useMemo(() => {
-    return [...vocabData].sort(() => 0.5 - Math.random()).slice(0, 20);
-  }, []);
+  const [filter, setFilter] = useState('all');
 
-  const handleNext = () => {
-    setShowAnswer(false);
-    if (currentIndex < words.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    } else {
-      recordActivity();
-      navigate('/');
-    }
-  };
+  const grammarMistakes = mistakes.filter(m => !m.type || m.type === 'grammar');
+  const dictationMistakes = mistakes.filter(m => m.type === 'dictation');
 
-  const w = words[currentIndex];
-
-  const playAudio = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ''));
-      utterance.lang = 'en-US';
-      window.speechSynthesis.speak(utterance);
-    }
-  };
+  const filtered = filter === 'grammar' ? grammarMistakes : filter === 'dictation' ? dictationMistakes : mistakes;
 
   return (
-    <div className="drill-container">
-      <div className="drill-header">
-        <h2>Daily Vocab</h2>
-        <span className="badge text-primary" style={{background: 'var(--accent-bg)', color: 'var(--accent)'}}>{currentIndex + 1} / {words.length}</span>
-      </div>
-      
-      <div className="flashcard" style={{minHeight: '250px'}}>
-        <div className="flashcard-front" style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'}}>
-          <h2 style={{fontSize: '2.5rem', margin: '0 0 1rem 0'}}>{w.word}</h2>
-          <button className="btn-icon audio-btn" onClick={() => playAudio(w.word)} title="Listen to pronunciation">
-            <PlayCircle size={28} />
-          </button>
+    <div style={{ maxWidth: '900px', margin: '2rem auto', padding: '0 1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--danger)' }}>📋 Error Log</h2>
+          <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{mistakes.length} kesalahan tercatat — dipakai Daily Mix untuk review personal</p>
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className={`btn ${filter==='all'?'btn-primary':'btn-outline'}`} onClick={() => setFilter('all')}>Semua</button>
+          <button className={`btn ${filter==='grammar'?'btn-primary':'btn-outline'}`} onClick={() => setFilter('grammar')}>Grammar</button>
+          <button className={`btn ${filter==='dictation'?'btn-primary':'btn-outline'}`} onClick={() => setFilter('dictation')}>Dictation</button>
+        </div>
+      </div>
 
-        <AnimatePresence>
-          {showAnswer && (
-            <motion.div initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} className="flashcard-back">
-              <div style={{fontSize: '1.2rem', fontWeight: '500', marginBottom: '1rem', color: 'var(--text-muted)'}}>{w.meaning}</div>
-              <div style={{background: 'var(--bg)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)'}}>
-                 <RichText text={w.example} />
-                 <button className="btn-icon audio-btn" style={{marginLeft: '0.5rem', verticalAlign: 'middle'}} onClick={() => playAudio(w.example)}><PlayCircle size={18} /></button>
+      {filtered.length === 0 ? (
+        <div className="content-box" style={{ textAlign: 'center', padding: '4rem 1rem' }}>
+          <CheckCircle2 size={64} style={{ color: 'var(--success)', margin: '0 auto 1rem' }} />
+          <h3>Error log kosong!</h3>
+          <p className="text-muted">Jawab kuis atau dictation untuk mulai mengisi buku kesalahan.</p>
+          <button className="btn btn-primary mt-4" onClick={() => navigate('/daily')}>Mulai Daily Mix</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {filtered.map((m, i) => {
+            const isDictation = m.type === 'dictation';
+            return (
+              <div key={i} className="content-box" style={{ padding: '1.25rem 1.5rem', borderLeft: `4px solid ${isDictation ? '#c026d3' : 'var(--danger)'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span className="badge" style={{ background: isDictation ? '#fdf4ff' : 'var(--danger-bg)', color: isDictation ? '#c026d3' : 'var(--danger)' }}>
+                        {isDictation ? 'Dictation' : `Unit ${m.unitId}`}
+                      </span>
+                      {m.timestamp && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(m.timestamp).toLocaleDateString()}</span>}
+                    </div>
+                    {isDictation ? (
+                      <>
+                        <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-strong)' }}>{m.text}</div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Kamu tulis: <em>"{m.userInput}"</em></div>
+                        {m.wrongWords?.length > 0 && (
+                          <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                            {m.wrongWords.map((w, wi) => (
+                              <span key={wi} style={{ padding: '1px 6px', borderRadius: '4px', background: '#fee2e2', color: '#991b1b', fontSize: '0.85rem', border: '1px solid #fca5a5' }}>{w}</span>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 500, marginBottom: '0.5rem' }}>{m.prompt}</div>
+                        {m.explanation && <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{m.explanation}</div>}
+                      </>
+                    )}
+                  </div>
+                  <button className="btn-icon" style={{ color: 'var(--danger)', flexShrink: 0 }} onClick={() => setMistakes(mistakes.filter((_, idx) => idx !== i))} title="Hapus dari log">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div className="drill-actions">
-        {!showAnswer ? (
-          <button className="btn btn-primary w-100" onClick={() => setShowAnswer(true)}>Flip Card</button>
-        ) : (
-          <button className="btn btn-primary w-100" onClick={handleNext}>Next Word <ArrowRight size={16} style={{marginLeft: '0.5rem'}}/></button>
-        )}
-      </div>
+            );
+          })}
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+            <button className="btn btn-primary" onClick={() => navigate('/daily')}>Latih Semua di Daily Mix</button>
+            <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => { if(confirm('Hapus seluruh error log?')) setMistakes([]); }}>Bersihkan Log</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-
-// --- IELTS VOCAB DRILL (20 PHRASES) ---
+// --- MISTAKE DRILL ---
 
 function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -922,9 +993,13 @@ function UnitContainer({ data, setData, bookmarks, setBookmarks, progress, setPr
   const unitId = parseInt(id);
   const unit = data.units.find(u => u.unit === unitId);
   const [activeTab, setActiveTab] = useState('learn');
+  const [currentUnitId, setCurrentUnitId] = useState(unitId);
   const navigate = useNavigate();
 
-  useEffect(() => { setActiveTab('learn'); }, [unitId]);
+  if (unitId !== currentUnitId) {
+    setCurrentUnitId(unitId);
+    setActiveTab('learn');
+  }
 
   if (!unit) return <div className="content-box">Unit not found</div>;
 
@@ -1032,7 +1107,7 @@ function LearnTab({ unit }) {
           <div className="pattern-label" style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent)', marginBottom: '0.8rem', letterSpacing: '1px' }}>GRAMMAR PATTERN</div>
           <div className="pattern-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {unit.explanation.pattern.replace(/(Negatif:|Tanya:|Positif:|\[\+\]|\[-\]|\[\?\]|Negative:|Question:)/gi, '\n$1').split(/[;\n]/).map(s => s.trim()).filter(Boolean).map((line, i) => (
-              <div key={i} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", color: "var(--accent)", fontSize: '0.95rem', background: 'var(--surface)', padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid var(--border)', color: 'var(--text-strong)' }}>
+              <div key={i} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '0.95rem', background: 'var(--surface)', padding: '0.6rem 1rem', borderRadius: '6px', border: '1px solid var(--border)', color: 'var(--text-strong)' }}>
                 <RichText text={line} />
               </div>
             ))}
@@ -1071,16 +1146,20 @@ function PracticeTab({ unit, setProgress, progress, mistakes, setMistakes, recor
   const [qIndex, setQIndex] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [inputValue, setInputValue] = useState('');
+  const [reorderSelected, setReorderSelected] = useState([]);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [currentUnit, setCurrentUnit] = useState(unit.unit);
 
-  useEffect(() => {
+  if (unit.unit !== currentUnit) {
+    setCurrentUnit(unit.unit);
     setQIndex(0);
     setFeedback(null);
     setInputValue('');
+    setReorderSelected([]);
     setScore(0);
     setShowResult(false);
-  }, [unit.unit]);
+  }
 
   const questions = unit.practice.questions;
 
@@ -1161,6 +1240,7 @@ function PracticeTab({ unit, setProgress, progress, mistakes, setMistakes, recor
   const nextQuestion = () => {
     setFeedback(null);
     setInputValue('');
+    setReorderSelected([]);
     if (qIndex < questions.length - 1) {
       setQIndex(prev => prev + 1);
     } else {
@@ -1265,11 +1345,13 @@ function EditTab({ unit, data, setData }) {
   const [formData, setFormData] = useState(JSON.parse(JSON.stringify(unit)));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [currentUnit, setCurrentUnit] = useState(unit.unit);
 
-  useEffect(() => {
+  if (unit.unit !== currentUnit) {
+    setCurrentUnit(unit.unit);
     setFormData(JSON.parse(JSON.stringify(unit)));
     setMessage('');
-  }, [unit.unit]);
+  }
 
   const handleSave = async () => {
     setSaving(true);

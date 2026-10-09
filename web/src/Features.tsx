@@ -132,7 +132,7 @@ export function PodcastListening() {
           </select>
           {podcast.videoId && (
             <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
-              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={\`https://www.youtube.com/embed/\${podcast.videoId}\`} frameBorder="0" allowFullScreen></iframe>
+              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${podcast.videoId}`} frameBorder="0" allowFullScreen></iframe>
             </div>
           )}
           {podcast.transcript && podcast.transcript.length > 0 && (
@@ -198,7 +198,7 @@ export function ShadowingDrill() {
 
           {session.videoId && (
             <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
-              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={\`https://www.youtube.com/embed/\${session.videoId}\`} frameBorder="0" allowFullScreen></iframe>
+              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${session.videoId}`} frameBorder="0" allowFullScreen></iframe>
             </div>
           )}
           
@@ -212,7 +212,7 @@ export function ShadowingDrill() {
                 <button className="btn btn-primary" style={{background: '#ca8a04', borderColor: '#ca8a04', borderRadius: '50px', padding: '0.5rem 2rem', fontSize: '1.2rem'}} onClick={playSentence}>{isPlaying ? 'Speaking...' : 'Play & Repeat'}</button>
                 <button className="btn btn-outline" disabled={sentenceIndex === session.sentences.length - 1} onClick={() => setSentenceIndex(sentenceIndex + 1)}><ArrowRight size={16}/></button>
               </div>
-              <div className="quiz-progress-bar"><div className="quiz-progress-fill" style={{background: '#ca8a04', width: \`\${((sentenceIndex + 1) / session.sentences.length) * 100}%\`}}></div></div>
+              <div className="quiz-progress-bar"><div className="quiz-progress-fill" style={{background: '#ca8a04', width: `${((sentenceIndex + 1) / session.sentences.length) * 100}%`}}></div></div>
               <div style={{marginTop: '0.5rem', color: 'var(--text-muted)'}}>{sentenceIndex + 1} / {session.sentences.length}</div>
             </>
           )}
@@ -253,7 +253,7 @@ export function WritingAnalyzer() {
 
           {essay.videoId && (
             <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
-              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={\`https://www.youtube.com/embed/\${essay.videoId}\`} frameBorder="0" allowFullScreen></iframe>
+              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${essay.videoId}`} frameBorder="0" allowFullScreen></iframe>
             </div>
           )}
 
@@ -294,29 +294,61 @@ export function WritingAnalyzer() {
   );
 }
 
-export function DictationDrill({ recordActivity }) {
+export function DictationDrill({ recordActivity, mistakes = [], setMistakes = null }) {
   const { data, loading, saveData } = useFeatureData('dictation');
   const [tab, setTab] = useState('practice');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [inputValue, setInputValue] = useState('');
   const [showResult, setShowResult] = useState(false);
+  const [playCount, setPlayCount] = useState(0);
+  const [accent, setAccent] = useState('en-US');
+  const MAX_PLAYS = 3;
 
   if (loading) return <div style={{textAlign:'center', marginTop:'2rem'}}>Loading...</div>;
   const d = data[currentIndex];
 
   const playAudio = (speed = 1.0) => {
     if ('speechSynthesis' in window && d) {
+      if (playCount >= MAX_PLAYS && !showResult) return;
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(d.text);
-      utterance.lang = 'en-US';
+      utterance.lang = accent;
       utterance.rate = speed;
       window.speechSynthesis.speak(utterance);
+      if (!showResult) setPlayCount(p => p + 1);
+    }
+  };
+
+  const computeDiff = (typed, correct) => {
+    const normalize = (s) => s.toLowerCase().replace(/[.,!?;:'"]/g, '').trim();
+    const typedWords = typed.trim().split(/\s+/).filter(Boolean);
+    const correctWords = correct.trim().split(/\s+/).filter(Boolean);
+    return correctWords.map((cw, i) => {
+      const tw = typedWords[i];
+      if (!tw) return { word: cw, status: 'missing' };
+      if (normalize(tw) === normalize(cw)) return { word: cw, typed: tw, status: 'correct' };
+      return { word: cw, typed: tw, status: 'wrong' };
+    });
+  };
+
+  const handleCheck = () => {
+    setShowResult(true);
+    if (d && setMistakes) {
+      const diff = computeDiff(inputValue, d.text);
+      const wrongWords = diff.filter(w => w.status !== 'correct').map(w => w.word);
+      if (wrongWords.length > 0) {
+        const already = (mistakes || []).some((m) => m.text === d.text && m.type === 'dictation');
+        if (!already) {
+          setMistakes([...(mistakes || []), { type: 'dictation', text: d.text, userInput: inputValue, wrongWords, hint: d.hint, timestamp: Date.now() }]);
+        }
+      }
     }
   };
 
   const nextQuestion = () => {
     setShowResult(false);
     setInputValue('');
+    setPlayCount(0);
     if (currentIndex < data.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -325,6 +357,10 @@ export function DictationDrill({ recordActivity }) {
     }
   };
 
+  const diffResult = showResult && d ? computeDiff(inputValue, d.text) : [];
+  const correctCount = diffResult.filter(w => w.status === 'correct').length;
+  const accuracy = diffResult.length > 0 ? Math.round((correctCount / diffResult.length) * 100) : 0;
+
   return (
     <div className="content-box" style={{maxWidth: '800px', margin: '2rem auto'}}>
       <div style={{display:'flex', gap:'1rem', marginBottom:'2rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
@@ -333,27 +369,68 @@ export function DictationDrill({ recordActivity }) {
       </div>
 
       {tab === 'practice' && d && (
-        <div style={{textAlign: 'center', padding: '1rem'}}>
-          <h2>Daily Dictation</h2>
-          <div className="badge mb-4" style={{background: '#fdf4ff', color: '#c026d3'}}>{currentIndex + 1} / {data.length}</div>
+        <div style={{textAlign: 'center', padding: '0.5rem'}}>
+          <h2 style={{color: '#c026d3', marginBottom: '0.5rem'}}>Daily Dictation</h2>
+          <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap'}}>
+            <span className="badge" style={{background: '#fdf4ff', color: '#c026d3'}}>{currentIndex + 1} / {data.length}</span>
+            <select value={accent} onChange={e => setAccent(e.target.value)} style={{padding: '0.3rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '0.85rem', background: 'var(--surface)'}}>
+              <option value="en-US">🇺🇸 US Accent</option>
+              <option value="en-GB">🇬🇧 UK Accent</option>
+            </select>
+            {!showResult && (
+              <span style={{fontSize: '0.85rem', color: playCount >= MAX_PLAYS ? 'var(--danger)' : 'var(--text-muted)'}}>Plays: {playCount}/{MAX_PLAYS}</span>
+            )}
+          </div>
+
           <div style={{display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2rem'}}>
-            <button className="btn btn-primary" style={{background: '#c026d3', borderColor: '#c026d3', borderRadius: '50px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => playAudio(1.0)}>
-              <PlayCircle size={32} />
+            <button className="btn btn-primary" style={{background: '#c026d3', borderColor: '#c026d3', borderRadius: '50px', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (!showResult && playCount >= MAX_PLAYS) ? 0.4 : 1}} onClick={() => playAudio(1.0)} disabled={!showResult && playCount >= MAX_PLAYS}>
+              <PlayCircle size={30} />
             </button>
-            <button className="btn btn-outline" style={{borderColor: '#c026d3', color: '#c026d3', borderRadius: '50px', width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center'}} onClick={() => playAudio(0.7)}>
-              <span style={{fontSize: '0.8rem', fontWeight: 'bold'}}>0.7x</span>
+            <button className="btn btn-outline" style={{borderColor: '#c026d3', color: '#c026d3', borderRadius: '50px', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: (!showResult && playCount >= MAX_PLAYS) ? 0.4 : 1}} onClick={() => playAudio(0.75)} disabled={!showResult && playCount >= MAX_PLAYS}>
+              <span style={{fontSize: '0.75rem', fontWeight: 'bold'}}>0.75x</span>
             </button>
           </div>
-          <textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Type what you hear..." disabled={showResult} style={{width: '100%', height: '120px', padding: '1rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: '1.1rem', marginBottom: '1rem', resize: 'none'}} />
+
+          <textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="Type what you hear..." disabled={showResult} style={{width: '100%', height: '120px', padding: '1rem', borderRadius: 'var(--radius)', border: `1px solid ${showResult ? 'var(--border)' : 'var(--accent)'}`, fontSize: '1.1rem', marginBottom: '1rem', resize: 'none', boxSizing: 'border-box', outline: 'none'}} />
+
           {!showResult ? (
-            <button className="btn btn-primary w-100" style={{background: '#c026d3', borderColor: '#c026d3'}} onClick={() => setShowResult(true)}>Check Answer</button>
+            <button className="btn btn-primary w-100" style={{background: '#c026d3', borderColor: '#c026d3'}} onClick={handleCheck} disabled={!inputValue.trim()}>Check Answer</button>
           ) : (
-            <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} style={{textAlign: 'left', background: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius)', borderLeft: '4px solid #c026d3'}}>
-              <h4 style={{marginTop: 0}}>Correct Text:</h4>
-              <p style={{fontSize: '1.1rem', color: 'var(--text-strong)', marginBottom: '1rem'}}>{d.text}</p>
-              <div className="badge" style={{background: '#fdf4ff', color: '#c026d3', marginBottom: '1rem'}}><Zap size={14} style={{verticalAlign:'middle', marginRight:'4px'}}/> Hint: {d.hint}</div>
+            <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} style={{textAlign: 'left'}}>
+              <div style={{textAlign: 'center', marginBottom: '1.5rem'}}>
+                <div style={{fontSize: '3.5rem', fontWeight: 800, color: accuracy >= 80 ? 'var(--success)' : accuracy >= 50 ? '#f59e0b' : 'var(--danger)', lineHeight: 1}}>{accuracy}%</div>
+                <div style={{color: 'var(--text-muted)', marginTop: '0.25rem'}}>{correctCount} / {diffResult.length} kata benar</div>
+              </div>
+
+              <div style={{background: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius)', marginBottom: '1.5rem', lineHeight: '2.5', fontSize: '1.05rem', border: '1px solid var(--border)'}}>
+                <div style={{fontWeight: 600, marginBottom: '0.75rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em'}}>Hasil Per Kata</div>
+                <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center'}}>
+                  {diffResult.map((item, i) => (
+                    <span key={i} style={{padding: '2px 8px', borderRadius: '6px', background: item.status === 'correct' ? '#dcfce7' : item.status === 'missing' ? '#fee2e2' : '#fef9c3', color: item.status === 'correct' ? '#166534' : item.status === 'missing' ? '#991b1b' : '#854d0e', border: `1px solid ${item.status === 'correct' ? '#86efac' : item.status === 'missing' ? '#fca5a5' : '#fde047'}`}}>
+                      {item.status === 'wrong' && <span style={{textDecoration: 'line-through', marginRight: '4px', opacity: 0.6}}>{item.typed}</span>}
+                      {item.word}
+                      {item.status === 'missing' && <span style={{fontStyle: 'italic', opacity: 0.6}}> (hilang)</span>}
+                    </span>
+                  ))}
+                </div>
+                <div style={{marginTop: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.8rem'}}>
+                  <span style={{display:'flex',alignItems:'center',gap:'4px'}}><span style={{width:'12px',height:'12px',borderRadius:'3px',background:'#dcfce7',border:'1px solid #86efac',display:'inline-block'}}></span>Benar</span>
+                  <span style={{display:'flex',alignItems:'center',gap:'4px'}}><span style={{width:'12px',height:'12px',borderRadius:'3px',background:'#fef9c3',border:'1px solid #fde047',display:'inline-block'}}></span>Salah</span>
+                  <span style={{display:'flex',alignItems:'center',gap:'4px'}}><span style={{width:'12px',height:'12px',borderRadius:'3px',background:'#fee2e2',border:'1px solid #fca5a5',display:'inline-block'}}></span>Kurang/Hilang</span>
+                </div>
+              </div>
+
+              <div style={{background: 'var(--accent-bg)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem', border: '1px solid var(--accent)', display: 'flex', alignItems: 'flex-start', gap: '0.5rem'}}>
+                <Zap size={16} style={{color: 'var(--accent)', marginTop: '2px', flexShrink: 0}} />
+                <span style={{fontSize: '0.95rem'}}><strong>Hint:</strong> {d.hint}</span>
+              </div>
+
+              <button className="btn btn-outline w-100" style={{marginBottom: '0.75rem', borderColor: '#c026d3', color: '#c026d3'}} onClick={() => playAudio(1.0)}>
+                <PlayCircle size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}} /> Dengarkan Jawaban Benar
+              </button>
+
               <button className="btn btn-primary w-100" style={{background: '#c026d3', borderColor: '#c026d3'}} onClick={nextQuestion}>
-                {currentIndex < data.length - 1 ? 'Next Audio' : 'Finish Dictation'} <ArrowRight size={16} style={{marginLeft: '0.5rem'}}/>
+                {currentIndex < data.length - 1 ? 'Audio Berikutnya' : 'Selesai Dictation'} <ArrowRight size={16} style={{marginLeft: '0.5rem', verticalAlign: 'middle'}}/>
               </button>
             </motion.div>
           )}
@@ -361,87 +438,9 @@ export function DictationDrill({ recordActivity }) {
       )}
 
       {tab === 'manage' && (
-        <CRUDManager data={data} saveData={saveData} type="Dictation" columns={[{key:'text', label:'Text'}]} template={{text: 'New sentence...', hint: 'Hint...'}} />
+        <CRUDManager data={data} saveData={saveData} type="Dictation" columns={[{key:'text', label:'Kalimat'}, {key:'hint', label:'Hint'}]} template={{text: 'New sentence...', hint: 'Hint tentang kesulitan...'}} />
       )}
     </div>
   );
 }
 
-export function IeltsDrill({ recordActivity }) {
-  const { data, loading, saveData } = useFeatureData('ielts_vocab');
-  const [tab, setTab] = useState('practice');
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showMeaning, setShowMeaning] = useState(false);
-
-  // We limit session to 20 just for practice view
-  const practiceData = data.slice(0, 20);
-
-  if (loading) return <div style={{textAlign:'center', marginTop:'2rem'}}>Loading...</div>;
-
-  const nextCard = () => {
-    if (currentIndex < practiceData.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setShowMeaning(false);
-    } else {
-      recordActivity();
-      window.location.hash = '#/';
-    }
-  };
-
-  const playAudio = (word) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = 'en-US';
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  const d = practiceData[currentIndex];
-
-  return (
-    <div className="content-box" style={{maxWidth: '800px', margin: '2rem auto'}}>
-      <div style={{display:'flex', gap:'1rem', marginBottom:'2rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-        <button className={`btn ${tab==='practice'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('practice')}>Practice</button>
-        <button className={`btn ${tab==='manage'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('manage')}>Manage / Edit</button>
-      </div>
-
-      {tab === 'practice' && d && (
-        <div className="drill-container">
-          <div className="drill-header">
-            <h2 style={{color: '#16a34a'}}>IELTS Vocab</h2>
-            <span className="badge" style={{background: '#f0fdf4', color: '#16a34a'}}>{currentIndex + 1} / {practiceData.length}</span>
-          </div>
-          <div className="flashcard">
-            <div className="flashcard-content">
-              <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem'}}>
-                <span className="badge" style={{background: '#e0f2fe', color: '#0369a1'}}>{d.type}</span>
-                <span className="badge" style={{background: '#fef3c7', color: '#b45309'}}>{d.theme}</span>
-              </div>
-              <h2 className="word" style={{fontSize: '2.5rem', color: '#16a34a'}}>{d.word}</h2>
-              <button className="btn-icon mt-2" onClick={() => playAudio(d.word)}>
-                <PlayCircle size={24} color="#16a34a" />
-              </button>
-              {showMeaning ? (
-                <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="meaning-section mt-4">
-                  <h4 style={{color: 'var(--text-strong)'}}>Meaning:</h4>
-                  <p style={{fontSize: '1.2rem'}}>{d.meaning}</p>
-                  <h4 className="mt-3" style={{color: 'var(--text-strong)'}}>Example:</h4>
-                  <p className="example-text" dangerouslySetInnerHTML={{__html: d.example}}></p>
-                </motion.div>
-              ) : (
-                <div className="mt-4"><button className="btn btn-outline" style={{borderColor: '#16a34a', color: '#16a34a'}} onClick={() => setShowMeaning(true)}>Show Meaning</button></div>
-              )}
-            </div>
-            {showMeaning && (
-              <div className="flashcard-footer"><button className="btn btn-primary w-100" style={{background: '#16a34a', borderColor: '#16a34a'}} onClick={nextCard}>Next Phrase <ArrowRight size={16} /></button></div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {tab === 'manage' && (
-        <CRUDManager data={data} saveData={saveData} type="IELTS Vocab" columns={[{key:'word', label:'Phrase'}, {key:'type', label:'Type'}, {key:'theme', label:'Theme'}]} template={{word: 'New phrase', type: 'Idiom', theme: 'General', meaning: 'Definition...', example: 'Example sentence...'}} />
-      )}
-    </div>
-  );
-}
