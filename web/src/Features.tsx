@@ -2,6 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, ArrowLeft, PlayCircle, Edit3, XCircle, CheckCircle2, Zap, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+function useLocalStorage(key: string, initialValue: any) {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: any) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.log(error);
+    }
+  };
+  return [storedValue, setValue];
+}
+
 function useFeatureData(type) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,61 +131,111 @@ function CRUDManager({ data, saveData, columns, type, template }) {
 
 // --- COMPONENTS ---
 
-export function PodcastListening() {
-  const { data, loading, saveData } = useFeatureData('podcast');
-  const [tab, setTab] = useState('practice');
-  const [podcastIndex, setPodcastIndex] = useState(0);
+export function PodcastListening({ recordActivity }) {
+  const [vocabData, setVocabData] = useLocalStorage('grammar_daily_data', []);
+  const [words, setWords] = useState(['', '', '']);
+  const [meanings, setMeanings] = useState(['', '', '']);
+  const [isDone, setIsDone] = useState(false);
 
-  if (loading) return <div style={{textAlign:'center', marginTop:'2rem'}}>Loading...</div>;
-  const podcast = data[podcastIndex];
+  const recommendations = [
+    { title: "6 Minute English (BBC)", url: "https://www.bbc.co.uk/learningenglish/english/features/6-minute-english", type: "Web" },
+    { title: "Luke's English Podcast", url: "https://teacherluke.co.uk/", type: "Web / Spotify" },
+    { title: "All Ears English", url: "https://www.allearsenglish.com/", type: "Web / Spotify" },
+    { title: "TED Talks Daily", url: "https://www.ted.com/podcasts/ted-talks-daily", type: "Web / Spotify" }
+  ];
+
+  const handleFinish = () => {
+    let added = 0;
+    const newVocab = [...vocabData];
+    for (let i = 0; i < 3; i++) {
+      if (words[i].trim() && meanings[i].trim()) {
+        newVocab.push({
+          word: words[i].trim(),
+          meaning: meanings[i].trim(),
+          example: 'Learned from podcast.',
+          nextReview: Date.now(),
+          interval: 1,
+          id: Date.now() + i
+        });
+        added++;
+      }
+    }
+    
+    if (added > 0) {
+      setVocabData(newVocab);
+    }
+    
+    setIsDone(true);
+    if (recordActivity) recordActivity();
+    setTimeout(() => {
+      window.location.hash = '#/';
+    }, 1500);
+  };
 
   return (
-    <div className="content-box" style={{maxWidth: '900px', margin: '2rem auto'}}>
-      <div style={{display:'flex', gap:'1rem', marginBottom:'2rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-        <button className={`btn ${tab==='practice'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('practice')}>Practice</button>
-        <button className={`btn ${tab==='manage'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('manage')}>Manage / Edit</button>
+    <div className="content-box" style={{maxWidth: '700px', margin: '2rem auto', padding: '2rem'}}>
+      <h2 style={{color: '#e11d48', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+        <PlayCircle size={28} /> Podcast Tracker
+      </h2>
+      <p style={{color: 'var(--text-muted)', marginBottom: '2rem'}}>Dengarkan 1 episode podcast bahasa Inggris, lalu catat 3 kosakata baru yang kamu temukan.</p>
+
+      <div style={{background: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: '2rem'}}>
+        <h4 style={{marginTop: 0, marginBottom: '1rem'}}>Rekomendasi Podcast ESL:</h4>
+        <ul style={{margin: 0, paddingLeft: '1.5rem', lineHeight: '1.8'}}>
+          {recommendations.map((r, i) => (
+            <li key={i}>
+              <a href={r.url} target="_blank" rel="noreferrer" style={{color: '#e11d48', fontWeight: 500, textDecoration: 'none'}}>{r.title}</a>
+              <span style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: '0.5rem'}}>({r.type})</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {tab === 'practice' && podcast && (
-        <div>
-          <h2 style={{color: '#e11d48'}}><PlayCircle size={24} style={{verticalAlign: 'middle'}}/> Podcast Listening</h2>
-          <select value={podcastIndex} onChange={(e) => setPodcastIndex(Number(e.target.value))} style={{width: '100%', padding: '0.75rem', marginBottom: '1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)'}}>
-            {data.map((p, i) => <option key={p.id} value={i}>{p.source}: {p.title}</option>)}
-          </select>
-          {podcast.videoId && (
-            <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
-              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${podcast.videoId}`} frameBorder="0" allowFullScreen></iframe>
-            </div>
-          )}
-          {podcast.transcript && podcast.transcript.length > 0 && (
-            <div style={{background: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)'}}>
-              <h3 style={{marginTop: 0}}>Interactive Transcript</h3>
-              <div style={{display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto'}}>
-                {podcast.transcript.map((t, idx) => (
-                  <div key={idx} style={{display: 'flex', gap: '1rem', padding: '0.5rem', borderRadius: 'var(--radius-sm)'}}>
-                    <span className="badge" style={{background: '#ffe4e6', color: '#e11d48', height: 'fit-content'}}>{t.time}</span>
-                    <span style={{lineHeight: '1.5'}}>{t.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <div style={{marginBottom: '2rem'}}>
+        <h4 style={{marginBottom: '1rem'}}>Catat 3 Kosakata Baru:</h4>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{display: 'flex', gap: '1rem', marginBottom: '1rem'}}>
+            <input 
+              type="text" 
+              placeholder={`Kata ${i+1}`} 
+              className="form-control" 
+              style={{flex: 1}} 
+              value={words[i]} 
+              onChange={e => { const w = [...words]; w[i] = e.target.value; setWords(w); }} 
+            />
+            <input 
+              type="text" 
+              placeholder="Artinya..." 
+              className="form-control" 
+              style={{flex: 1}} 
+              value={meanings[i]} 
+              onChange={e => { const m = [...meanings]; m[i] = e.target.value; setMeanings(m); }} 
+            />
+          </div>
+        ))}
+      </div>
 
-      {tab === 'manage' && (
-        <CRUDManager data={data} saveData={saveData} type="Podcast" columns={[{key:'source', label:'Source'}, {key:'title', label:'Title'}, {key:'videoId', label:'YouTube ID'}]} template={{source: 'New Source', title: 'New Podcast', videoId: 'YOUTUBE_ID', transcript: []}} />
+      {isDone ? (
+        <div style={{textAlign: 'center', color: 'var(--success)', padding: '1rem', background: 'var(--success-bg)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 'bold'}}>
+          <CheckCircle2 size={24} /> Selesai! Mengembalikan ke Dashboard...
+        </div>
+      ) : (
+        <button className="btn btn-primary w-100" style={{background: '#e11d48', borderColor: '#e11d48', padding: '1rem', fontSize: '1.1rem'}} onClick={handleFinish}>
+          <CheckCircle2 size={20} style={{verticalAlign: 'middle', marginRight: '0.5rem'}} />
+          Selesaikan & Simpan Kosakata
+        </button>
       )}
     </div>
   );
 }
 
-export function ShadowingDrill() {
+export function ShadowingDrill({ recordActivity }) {
   const { data, loading, saveData } = useFeatureData('shadowing');
   const [tab, setTab] = useState('practice');
   const [sessionIndex, setSessionIndex] = useState(0);
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isDone, setIsDone] = useState(false);
 
   if (loading) return <div style={{textAlign:'center', marginTop:'2rem'}}>Loading...</div>;
   const session = data[sessionIndex];
@@ -180,6 +252,14 @@ export function ShadowingDrill() {
       window.speechSynthesis.speak(utterance);
     }
   };
+  
+  const handleComplete = () => {
+    setIsDone(true);
+    if (recordActivity) recordActivity();
+    setTimeout(() => {
+      window.location.hash = '#/';
+    }, 1500);
+  };
 
   return (
     <div className="content-box" style={{maxWidth: '800px', margin: '2rem auto'}}>
@@ -190,105 +270,145 @@ export function ShadowingDrill() {
 
       {tab === 'practice' && session && (
         <div style={{textAlign: 'center'}}>
-          <h2 style={{color: '#ca8a04'}}><PlayCircle size={24} style={{verticalAlign: 'middle'}}/> Speaking Shadowing</h2>
+          <h2 style={{color: '#ca8a04', marginBottom: '1.5rem'}}><PlayCircle size={28} style={{verticalAlign: 'middle', marginRight: '0.5rem'}}/> Speaking Shadowing</h2>
           
-          <select value={sessionIndex} onChange={(e) => {setSessionIndex(Number(e.target.value)); setSentenceIndex(0);}} style={{width: '100%', padding: '0.75rem', marginBottom: '1.5rem', borderRadius: 'var(--radius-sm)'}}>
+          <select value={sessionIndex} onChange={(e) => {setSessionIndex(Number(e.target.value)); setSentenceIndex(0);}} style={{width: '100%', padding: '0.75rem', marginBottom: '1.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)'}}>
             {data.map((s, i) => <option key={s.id} value={i}>{s.title}</option>)}
           </select>
 
           {session.videoId && (
-            <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
+            <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem', background: 'black'}}>
               <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${session.videoId}`} frameBorder="0" allowFullScreen></iframe>
             </div>
           )}
           
           {sentence && (
             <>
-              <div style={{background: 'var(--surface)', padding: '3rem 2rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: '2rem', minHeight: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                <h3 style={{fontSize: '1.8rem', lineHeight: '1.5', margin: 0, color: isPlaying ? '#ca8a04' : 'var(--text)'}}>{sentence}</h3>
+              <div style={{background: 'var(--surface)', padding: '2rem 1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)', marginBottom: '2rem', minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                <h3 style={{fontSize: '1.6rem', lineHeight: '1.5', margin: 0, color: isPlaying ? '#ca8a04' : 'var(--text-strong)'}}>{sentence}</h3>
               </div>
               <div style={{display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2rem'}}>
-                <button className="btn btn-outline" disabled={sentenceIndex === 0} onClick={() => setSentenceIndex(sentenceIndex - 1)}><ArrowLeft size={16}/></button>
-                <button className="btn btn-primary" style={{background: '#ca8a04', borderColor: '#ca8a04', borderRadius: '50px', padding: '0.5rem 2rem', fontSize: '1.2rem'}} onClick={playSentence}>{isPlaying ? 'Speaking...' : 'Play & Repeat'}</button>
-                <button className="btn btn-outline" disabled={sentenceIndex === session.sentences.length - 1} onClick={() => setSentenceIndex(sentenceIndex + 1)}><ArrowRight size={16}/></button>
+                <button className="btn btn-outline" disabled={sentenceIndex === 0} onClick={() => setSentenceIndex(sentenceIndex - 1)}><ArrowLeft size={18}/></button>
+                <button className="btn btn-primary" style={{background: '#ca8a04', borderColor: '#ca8a04', borderRadius: '50px', padding: '0.75rem 2rem', fontSize: '1.2rem', minWidth: '180px'}} onClick={playSentence}>
+                  {isPlaying ? 'Speaking...' : 'Play & Repeat'}
+                </button>
+                <button className="btn btn-outline" disabled={sentenceIndex === session.sentences.length - 1} onClick={() => setSentenceIndex(sentenceIndex + 1)}><ArrowRight size={18}/></button>
               </div>
               <div className="quiz-progress-bar"><div className="quiz-progress-fill" style={{background: '#ca8a04', width: `${((sentenceIndex + 1) / session.sentences.length) * 100}%`}}></div></div>
-              <div style={{marginTop: '0.5rem', color: 'var(--text-muted)'}}>{sentenceIndex + 1} / {session.sentences.length}</div>
+              <div style={{marginTop: '0.5rem', marginBottom: '2rem', color: 'var(--text-muted)'}}>{sentenceIndex + 1} / {session.sentences.length} Kalimat</div>
+              
+              {isDone ? (
+                <div style={{color: 'var(--success)', fontWeight: 'bold'}}><CheckCircle2 size={20} style={{verticalAlign:'middle', marginRight:'5px'}} /> Shadowing Selesai!</div>
+              ) : (
+                <button className="btn btn-outline w-100" style={{borderColor: '#ca8a04', color: '#ca8a04', padding: '0.75rem'}} onClick={handleComplete}>
+                  Tandai Selesai & Kembali ke Dashboard
+                </button>
+              )}
             </>
           )}
         </div>
       )}
 
       {tab === 'manage' && (
-        <CRUDManager data={data} saveData={saveData} type="Shadowing" columns={[{key:'title', label:'Title'}, {key:'difficulty', label:'Difficulty'}, {key:'videoId', label:'YouTube ID'}]} template={{title: 'New Session', difficulty: 'Intermediate', videoId: '', sentences: []}} />
+        <CRUDManager data={data} saveData={saveData} type="Shadowing" columns={[{key:'title', label:'Title'}, {key:'videoId', label:'YouTube ID'}]} template={{title: 'New Session', difficulty: 'Intermediate', videoId: '', sentences: []}} />
       )}
     </div>
   );
 }
 
-export function WritingAnalyzer() {
-  const { data, loading, saveData } = useFeatureData('writing_essays');
-  const [tab, setTab] = useState('practice');
-  const [essayIndex, setEssayIndex] = useState(0);
-  const [activeSentence, setActiveSentence] = useState(null);
+export function WritingAnalyzer({ recordActivity }) {
+  const [text, setText] = useState('');
+  const [issues, setIssues] = useState([]);
+  const [isAnalyzed, setIsAnalyzed] = useState(false);
 
-  if (loading) return <div style={{textAlign:'center', marginTop:'2rem'}}>Loading...</div>;
-  const essay = data[essayIndex];
+  const RULES = [
+    { id: 'a_an_vowel', pattern: /\b([Aa])\s+([aeiou][a-z]*)\b/gi, message: 'Gunakan "an" sebelum huruf vokal.', type: 'grammar' },
+    { id: 'an_consonant', pattern: /\b([Aa]n)\s+([^aeiou\W][a-z]*)\b/gi, message: 'Gunakan "a" sebelum huruf konsonan.', type: 'grammar' },
+    { id: 'he_she_it_dont', pattern: /\b(he|she|it)\s+(don't|do not)\b/gi, message: 'Gunakan "doesn\'t" atau "does not" untuk he/she/it.', type: 'grammar' },
+    { id: 'subject_verb_is', pattern: /\b(i|you|we|they)\s+is\b/gi, message: 'Periksa to-be. Gunakan am/are untuk subjek ini.', type: 'grammar' },
+    { id: 'double_space', pattern: / {2,}/g, message: 'Terdapat spasi ganda.', type: 'typography' },
+    { id: 'i_lowercase', pattern: /(^|\s)(i)(?=[\s.!?,'"]|$)/g, message: 'Kata ganti "I" harus selalu kapital.', type: 'capitalization' },
+    { id: 'no_capital_start', pattern: /(^|[.!?]\s+)([a-z])/g, message: 'Awal kalimat harus menggunakan huruf kapital.', type: 'capitalization' },
+    { id: 'punctuation_space', pattern: /\s+([.,!?])/g, message: 'Tidak boleh ada spasi sebelum tanda baca.', type: 'typography' }
+  ];
+
+  const analyzeText = () => {
+    if (!text.trim()) return;
+    const foundIssues = [];
+    
+    RULES.forEach(rule => {
+      let match;
+      // Reset lastIndex for global regex
+      rule.pattern.lastIndex = 0;
+      while ((match = rule.pattern.exec(text)) !== null) {
+        foundIssues.push({
+          ruleId: rule.id,
+          message: rule.message,
+          match: match[0],
+          index: match.index,
+          type: rule.type
+        });
+      }
+    });
+
+    setIssues(foundIssues.sort((a, b) => a.index - b.index));
+    setIsAnalyzed(true);
+  };
+
+  const handleComplete = () => {
+    if (recordActivity) recordActivity();
+    window.location.hash = '#/';
+  };
 
   return (
-    <div className="content-box" style={{maxWidth: '900px', margin: '2rem auto'}}>
-      <div style={{display:'flex', gap:'1rem', marginBottom:'2rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-        <button className={`btn ${tab==='practice'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('practice')}>Practice</button>
-        <button className={`btn ${tab==='manage'?'btn-primary':'btn-outline'}`} onClick={()=>setTab('manage')}>Manage / Edit</button>
-      </div>
+    <div className="content-box" style={{maxWidth: '800px', margin: '2rem auto', padding: '2rem'}}>
+      <h2 style={{color: '#2563eb', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem'}}>
+        <Edit3 size={28} /> Writing Analyzer (RegEx)
+      </h2>
+      <p style={{color: 'var(--text-muted)', marginBottom: '2rem'}}>Ketik esai atau paragraf Anda di sini. Sistem akan mendeteksi kesalahan umum 100% secara lokal.</p>
 
-      {tab === 'practice' && essay && (
-        <div>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem'}}>
-            <select value={essayIndex} onChange={(e) => setEssayIndex(Number(e.target.value))} style={{width: '70%', padding: '0.75rem', borderRadius: 'var(--radius-sm)'}}>
-              {data.map((e, i) => <option key={e.id} value={i}>{e.title}</option>)}
-            </select>
-            <div className="badge" style={{fontSize: '1.2rem', background: '#eff6ff', color: '#2563eb', padding: '0.5rem 1rem'}}>Band {essay.band}</div>
-          </div>
+      <textarea
+        className="form-control"
+        style={{width: '100%', height: '250px', padding: '1rem', fontSize: '1.1rem', resize: 'vertical', marginBottom: '1rem', fontFamily: 'inherit', lineHeight: '1.6'}}
+        placeholder="Start typing your English text here..."
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setIsAnalyzed(false);
+        }}
+      />
 
-          {essay.videoId && (
-            <div style={{position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 'var(--radius)', marginBottom: '1.5rem'}}>
-              <iframe style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}} src={`https://www.youtube.com/embed/${essay.videoId}`} frameBorder="0" allowFullScreen></iframe>
-            </div>
-          )}
-
-          <div style={{background: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius)', marginBottom: '2rem', borderLeft: '4px solid #94a3b8'}}>
-            <strong>Prompt:</strong> {essay.prompt}
-          </div>
-
-          <div className="essay-content" style={{lineHeight: '2.2', fontSize: '1.1rem'}}>
-            {essay.paragraphs && essay.paragraphs.map((p, pIdx) => (
-              <div key={pIdx} style={{marginBottom: '1.5rem'}}>
-                {p.sentences && p.sentences.map((s, sIdx) => (
-                  <span key={sIdx} style={{backgroundColor: s.highlight, padding: '2px 4px', borderRadius: '4px', cursor: 'pointer', transition: '0.2s', boxShadow: activeSentence === s ? '0 0 0 2px rgba(0,0,0,0.2)' : 'none'}} onMouseEnter={() => setActiveSentence(s)} onMouseLeave={() => setActiveSentence(null)} onClick={() => setActiveSentence(s)}>
-                    {s.text}{' '}
-                  </span>
+      {!isAnalyzed ? (
+        <button className="btn btn-primary w-100" style={{padding: '1rem', fontSize: '1.1rem', background: '#2563eb', borderColor: '#2563eb'}} onClick={analyzeText} disabled={!text.trim()}>
+          <Zap size={20} style={{verticalAlign: 'middle', marginRight: '0.5rem'}} />
+          Analyze Writing
+        </button>
+      ) : (
+        <div style={{animation: 'fadeIn 0.3s'}}>
+          <div style={{background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.5rem', marginBottom: '1.5rem'}}>
+            <h3 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+              {issues.length === 0 ? <CheckCircle2 color="var(--success)" /> : <XCircle color="#e11d48" />}
+              {issues.length === 0 ? 'Teks Terlihat Bagus!' : `Ditemukan ${issues.length} potensi kesalahan:`}
+            </h3>
+            
+            {issues.length > 0 && (
+              <div style={{display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem'}}>
+                {issues.map((issue, idx) => (
+                  <div key={idx} style={{padding: '1rem', background: '#f8fafc', borderLeft: `4px solid ${issue.type === 'grammar' ? '#e11d48' : '#f59e0b'}`, borderRadius: '0 var(--radius-sm) var(--radius-sm) 0'}}>
+                    <div style={{fontWeight: 'bold', color: 'var(--text-strong)', marginBottom: '0.25rem'}}>
+                      "{issue.match.trim()}"
+                    </div>
+                    <div style={{color: 'var(--text)', fontSize: '0.95rem'}}>{issue.message}</div>
+                  </div>
                 ))}
               </div>
-            ))}
-          </div>
-
-          <AnimatePresence>
-            {activeSentence && (
-              <motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} style={{position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: 'white', padding: '1.5rem', borderRadius: 'var(--radius)', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', width: '90%', maxWidth: '600px', zIndex: 100}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem'}}>
-                  <span className="badge" style={{background: activeSentence.highlight, color: '#0f172a'}}>{activeSentence.category}</span>
-                  <button className="btn-icon" style={{color: 'white', padding: 0}} onClick={() => setActiveSentence(null)}><XCircle size={18} /></button>
-                </div>
-                <p style={{margin: 0, fontSize: '0.95rem'}}>{activeSentence.note}</p>
-              </motion.div>
             )}
-          </AnimatePresence>
+          </div>
+          
+          <button className="btn btn-outline w-100" style={{padding: '1rem'}} onClick={handleComplete}>
+            Tandai Selesai & Kembali ke Dashboard
+          </button>
         </div>
-      )}
-
-      {tab === 'manage' && (
-        <CRUDManager data={data} saveData={saveData} type="Writing Essays" columns={[{key:'title', label:'Title'}, {key:'band', label:'Band'}, {key:'videoId', label:'YouTube ID'}]} template={{title: 'New Essay', prompt: 'Prompt text', band: 8.0, videoId: '', paragraphs: []}} />
       )}
     </div>
   );

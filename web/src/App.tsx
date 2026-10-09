@@ -163,13 +163,13 @@ function App() {
               setDailyTasks(tasks => tasks.map(t => t.id === 'vocab' ? {...t, done: true} : t));
             }} />} />
             <Route path="/ielts" element={<VocabEngine deckName="ielts" title="IELTS Vocab" initialData={ieltsVocabData} recordActivity={recordActivity} />} />
-            <Route path="/writing" element={<WritingAnalyzer />} />
+            <Route path="/writing" element={<WritingAnalyzer recordActivity={recordActivity} />} />
             <Route path="/dictation" element={<DictationDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
               recordActivity();
               setDailyTasks(tasks => tasks.map(t => t.id === 'dictation' ? {...t, done: true} : t));
             }} />} />
-            <Route path="/shadowing" element={<ShadowingDrill />} />
-            <Route path="/podcast" element={<PodcastListening />} />
+            <Route path="/shadowing" element={<ShadowingDrill recordActivity={recordActivity} />} />
+            <Route path="/podcast" element={<PodcastListening recordActivity={recordActivity} />} />
             <Route path="/error-log" element={<ErrorLog mistakes={mistakes} setMistakes={setMistakes} />} />
                       </Routes>
         </main>
