@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "IELTS Speaking Part 2: A Memorable Journey",
+    "difficulty": "Intermediate",
+    "sentences": [
+      "I'd like to talk about a memorable journey I took to the mountains last summer.",
+      "It was a spontaneous trip with a couple of my closest friends.",
+      "We decided to escape the hustle and bustle of the city for a few days.",
+      "The scenery along the way was absolutely breathtaking.",
+      "Lush green forests and towering peaks stretched as far as the eye could see.",
+      "The fresh, crisp mountain air was incredibly invigorating.",
+      "Looking back, it was a much-needed break that really recharged my batteries."
+    ]
+  },
+  {
+    "id": 2,
+    "title": "IELTS Speaking Part 3: Technology in Education",
+    "difficulty": "Advanced",
+    "sentences": [
+      "I firmly believe that technology has revolutionized the educational landscape.",
+      "In the past, learning was heavily reliant on rote memorization and textbooks.",
+      "Nowadays, students have unparalleled access to an ocean of information at their fingertips.",
+      "Interactive tools and multimedia resources can significantly enhance student engagement.",
+      "However, we must also be cautious about the digital divide.",
+      "Not every student has the privilege of accessing high-speed internet or modern devices.",
+      "Therefore, it's crucial for governments to bridge this gap to ensure equal opportunities."
+    ]
+  }
+]

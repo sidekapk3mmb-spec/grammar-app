@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "source": "TED Talks",
+    "title": "The power of vulnerability | Brené Brown",
+    "videoId": "iCvmsMzlF7o",
+    "description": "Brené Brown studies human connection -- our ability to empathize, belong, love. In a poignant, funny talk, she shares a deep insight from her research.",
+    "transcript": [
+      { "time": "00:00", "text": "So, I'll start with this: a couple years ago, an event planner called me because I was going to do a speaking event." },
+      { "time": "00:07", "text": "And she called, and she said, 'I'm really struggling with how to write about you on the little flyer.'" },
+      { "time": "00:13", "text": "And I thought, 'Well, what's the struggle?' And she said, 'Well, I saw you speak, and I'm going to call you a researcher, I think, but I'm afraid if I call you a researcher, no one will come, because they'll think you're boring and irrelevant.'" },
+      { "time": "00:27", "text": "And I was like, 'Okay.' And she said, 'But the thing I liked about your talk is you're a storyteller. So I think what I'll do is just call you a storyteller.'" }
+    ]
+  },
+  {
+    "id": 2,
+    "source": "Diary of a CEO",
+    "title": "Simon Sinek: The Number One Reason Why You're Not Succeeding",
+    "videoId": "RyTWcrgRkG8",
+    "description": "Simon Sinek discusses the infinite game, leadership, and why the current corporate structure is fundamentally flawed.",
+    "transcript": [
+      { "time": "00:00", "text": "The problem with the way we do business today is that it's largely finite." },
+      { "time": "00:05", "text": "We're obsessed with winning, we're obsessed with beating the competition, we're obsessed with being number one." },
+      { "time": "00:11", "text": "The problem is, business is an infinite game." },
+      { "time": "00:14", "text": "There's no such thing as 'winning' business. There's no such thing as being 'number one' in business." },
+      { "time": "00:19", "text": "Because the game doesn't end. And when you play with a finite mindset in an infinite game, you get some very predictable outcomes." }
+    ]
+  }
+]

@@ -1,0 +1,90 @@
+[
+  {
+    "id": 1,
+    "title": "Environmental Problems: Individual vs Global",
+    "prompt": "Some people think that environmental problems are too big for individuals to solve. Others believe individuals can also do some things to solve these problems. Discuss both views and give your opinion.",
+    "band": 8.5,
+    "paragraphs": [
+      {
+        "type": "Introduction",
+        "sentences": [
+          {
+            "text": "The sheer scale of contemporary environmental issues has led some to argue that only coordinated, large-scale government action can effectively mitigate them.",
+            "category": "Task Response",
+            "highlight": "#dbeafe",
+            "note": "Excellent paraphrasing of the first view. Uses advanced vocabulary ('contemporary', 'mitigate', 'coordinated')."
+          },
+          {
+            "text": "However, I firmly believe that the collective impact of individual daily choices plays an equally vital role in global environmental conservation.",
+            "category": "Task Response",
+            "highlight": "#dcfce7",
+            "note": "Clear thesis statement presenting the author's opinion without using basic phrases like 'I think'."
+          }
+        ]
+      },
+      {
+        "type": "Body Paragraph 1 (View 1)",
+        "sentences": [
+          {
+            "text": "On the one hand, those who advocate for systemic interventions argue that major polluters are primarily massive corporations and industries.",
+            "category": "Coherence",
+            "highlight": "#fef08a",
+            "note": "Strong topic sentence using a clear linking phrase ('On the one hand') and precise vocabulary ('systemic interventions')."
+          },
+          {
+            "text": "For instance, transitioning a nation's energy grid from fossil fuels to renewable sources like solar or wind power requires monumental financial investments and infrastructural changes that are completely beyond the capacity of ordinary citizens.",
+            "category": "Lexical Resource",
+            "highlight": "#e0e7ff",
+            "note": "Great use of topic-specific vocabulary: 'energy grid', 'fossil fuels', 'monumental financial investments'."
+          },
+          {
+            "text": "Consequently, without stringent government policies and international treaties to regulate these entities, individual efforts might seem like a drop in the ocean.",
+            "category": "Grammar",
+            "highlight": "#ffedd5",
+            "note": "Complex sentence structure using 'without [condition], [result]' and an idiomatic expression ('a drop in the ocean')."
+          }
+        ]
+      },
+      {
+        "type": "Body Paragraph 2 (View 2 & Opinion)",
+        "sentences": [
+          {
+            "text": "On the other hand, the power of grassroots movements and individual consumer behavior should not be underestimated.",
+            "category": "Coherence",
+            "highlight": "#fef08a",
+            "note": "Contrasting linking phrase ('On the other hand') with excellent vocabulary ('grassroots movements')."
+          },
+          {
+            "text": "When millions of people consciously decide to reduce their carbon footprint by minimizing plastic use, adopting plant-based diets, or utilizing public transportation, the cumulative effect forces markets to shift towards sustainable alternatives.",
+            "category": "Grammar",
+            "highlight": "#ffedd5",
+            "note": "A complex 'When' clause listing three parallel actions, demonstrating excellent grammatical control."
+          },
+          {
+            "text": "This consumer-driven demand is often the very catalyst that compels governments to enact greener legislations in the first place.",
+            "category": "Lexical Resource",
+            "highlight": "#e0e7ff",
+            "note": "'Consumer-driven demand', 'catalyst', and 'compels' show a very high level of lexical resource."
+          }
+        ]
+      },
+      {
+        "type": "Conclusion",
+        "sentences": [
+          {
+            "text": "In conclusion, while the magnitude of ecological crises necessitates sweeping governmental regulations, this does not absolve individuals of their responsibilities.",
+            "category": "Task Response",
+            "highlight": "#dbeafe",
+            "note": "Summarizes the discussion perfectly while using sophisticated language ('magnitude of ecological crises', 'sweeping governmental regulations', 'absolve')."
+          },
+          {
+            "text": "It is only through the synergy of top-down policies and bottom-up individual actions that long-term environmental sustainability can be achieved.",
+            "category": "Grammar",
+            "highlight": "#ffedd5",
+            "note": "Uses an emphatic 'It is only through...' structure (cleft sentence) to end the essay powerfully."
+          }
+        ]
+      }
+    ]
+  }
+]
