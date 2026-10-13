@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { BookOpen, Edit3, Save, Layout, PlayCircle, PlusCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Calendar, Upload, Download, AlertTriangle, Shuffle, Menu } from 'lucide-react';
+import { BookOpen, Edit3, Save, Layout, PlayCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Upload, Download, AlertTriangle, Shuffle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PodcastListening, ShadowingDrill, WritingAnalyzer, DictationDrill } from './Features';
 import { VocabEngine } from './VocabEngine';
@@ -13,7 +13,7 @@ function useLocalStorage(key, initialValue) {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
+    } catch {
       return initialValue;
     }
   });
@@ -77,7 +77,6 @@ function App() {
   const [bookmarks, setBookmarks] = useLocalStorage('grammar_bookmarks', []);
   const [progress, setProgress] = useLocalStorage('grammar_progress', {}); // { unitId: score }
   const [mistakes, setMistakes] = useLocalStorage('grammar_mistakes', []); // Error log
-  const [vocab, setVocab] = useLocalStorage('grammar_vocab', []); // Personal vocab book
   const [lastActive, setLastActive] = useLocalStorage('grammar_last_active', null);
   const [streak, setStreak] = useLocalStorage('grammar_streak', 0);
   
@@ -106,11 +105,14 @@ function App() {
   }, [lastActive, setStreak]);
 
   const recordActivity = () => {
+    const todayStr = new Date().toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+
     if (lastActive !== todayStr) {
       if (lastActive === yesterdayStr) {
         setStreak(s => s + 1);
-      } else if (lastActive !== null) {
-        setStreak(1);
       } else {
         setStreak(1);
       }
@@ -493,17 +495,18 @@ function Dashboard({ data, progress, bookmarks, mistakes, streak, dailyTasks, se
 function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
   const [qIndex, setQIndex] = useState(0);
   const [feedback, setFeedback] = useState(null);
+  const [inputValue, setInputValue] = useState('');
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const navigate = useNavigate();
 
-  const questions = useMemo(() => {
-    let pool = [...mistakes].sort(() => 0.5 - Math.random());
+  const [questions] = useState(() => {
+    let pool = mistakes.filter((m: any) => m.type !== 'dictation' && m.prompt).sort(() => 0.5 - Math.random());
     
     if (pool.length < 5) {
       const weakestUnits = [...data.units].map(u => ({
           unitId: u.unit, 
-          mistakeCount: mistakes.filter((m: any) => m.unitId === u.unit).length
+          mistakeCount: mistakes.filter((m: any) => m.unitId === u.unit && m.type !== 'dictation').length
       })).sort((a,b) => b.mistakeCount - a.mistakeCount).slice(0, 3);
       
       let fillerPool: any[] = [];
@@ -525,13 +528,13 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
           }
       }
 
-      fillerPool = fillerPool.filter(fq => !pool.some(pq => pq.prompt === fq.prompt));
+      fillerPool = fillerPool.filter(fq => !pool.some((pq: any) => pq.prompt === fq.prompt));
       fillerPool.sort(() => 0.5 - Math.random());
       pool = [...pool, ...fillerPool.slice(0, 5 - pool.length)];
     }
 
     return pool.slice(0, 5).sort(() => 0.5 - Math.random());
-  }, [data, progress, mistakes]);
+  });
 
   if (!questions) return <div className="loading-screen"><div className="spinner"></div>Loading Quiz...</div>;
   if (questions.length === 0) return (
@@ -580,6 +583,7 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
 
   const nextQuestion = () => {
     setFeedback(null);
+    setInputValue('');
     if (qIndex < questions.length - 1) {
       setQIndex(prev => prev + 1);
     } else {
@@ -596,7 +600,7 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
       
       {q.type === 'multiple_choice' ? (
         <div className="options-grid">
-          {q.options.map((opt, idx) => (
+          {q.options.map((opt: string, idx: number) => (
             <button key={idx} className={`quiz-option ${feedback ? (idx === q.answer_index ? 'correct' : (idx !== q.answer_index && !feedback.isCorrect ? 'disabled' : '')) : ''}`} onClick={() => handleAnswer(idx === q.answer_index, q.options[q.answer_index])}>
               <RichText text={opt} />
             </button>
@@ -604,12 +608,29 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
         </div>
       ) : (
         <div className="fill-blank-container">
-          <input type="text" id="daily-input" className="fill-input" placeholder="Type answer..." disabled={feedback !== null} onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              const val = e.target.value;
-              handleAnswer(q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(val)), q.accepted_answers[0]);
-            }
-          }} />
+          <input 
+            type="text" 
+            id="daily-input" 
+            className="fill-input" 
+            placeholder="Type answer..." 
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={feedback !== null} 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleAnswer(q.accepted_answers.some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0]);
+              }
+            }} 
+          />
+          {!feedback && (
+            <button 
+              className="btn btn-primary mt-3" 
+              onClick={() => handleAnswer(q.accepted_answers.some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0])}
+              disabled={!inputValue.trim()}
+            >
+              Check Answer
+            </button>
+          )}
         </div>
       )}
 
@@ -749,30 +770,6 @@ function MixedDrill({ data, progress, recordActivity }) {
             }
           }} />
           {!feedback && <button className="btn btn-primary mt-3" onClick={() => handleAnswer(q.accepted_answers.some(ans => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0])}>Check</button>}
-        </div>
-      )}
-
-      {q.type === 'reorder' && (
-        <div className="reorder-container">
-          <div className="reorder-dropzone" style={{minHeight: '50px', padding: '1rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
-            {reorderSelected.length === 0 && <span style={{color: 'var(--text-muted)'}}>Select words below...</span>}
-            {reorderSelected.map((w, i) => (
-              <span key={i} className="badge" style={{fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: 'var(--accent)', color: 'white'}} onClick={() => { if(!feedback) { const n = [...reorderSelected]; n.splice(i,1); setReorderSelected(n); } }}>{w}</span>
-            ))}
-          </div>
-          <div className="reorder-words" style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem'}}>
-            {q.words && q.words.map((w, i) => {
-               const selectedCount = reorderSelected.filter(sw => sw === w).length;
-               const totalCount = q.words.filter(tw => tw === w).length;
-               const disabled = selectedCount >= totalCount || feedback !== null;
-               return (
-                 <button key={i} className="btn btn-outline" style={{padding: '0.5rem 1rem', opacity: disabled ? 0.5 : 1}} disabled={disabled} onClick={() => { if(!feedback) setReorderSelected([...reorderSelected, w]); }}>{w}</button>
-               );
-            })}
-          </div>
-          {!feedback && q.words && reorderSelected.length === q.words.length && (
-            <button className="btn btn-primary" onClick={handleReorderCheck}>Check Answer</button>
-          )}
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, PlayCircle, Edit3, XCircle, CheckCircle2, Zap, Save } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, ArrowLeft, PlayCircle, Edit3, XCircle, CheckCircle2, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 function useLocalStorage(key: string, initialValue: any) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -132,6 +133,7 @@ function CRUDManager({ data, saveData, columns, type, template }) {
 // --- COMPONENTS ---
 
 export function PodcastListening({ recordActivity }) {
+  const navigate = useNavigate();
   const [vocabData, setVocabData] = useLocalStorage('grammar_daily_data', []);
   const [words, setWords] = useState(['', '', '']);
   const [meanings, setMeanings] = useState(['', '', '']);
@@ -168,7 +170,7 @@ export function PodcastListening({ recordActivity }) {
     setIsDone(true);
     if (recordActivity) recordActivity();
     setTimeout(() => {
-      window.location.hash = '#/';
+      navigate('/');
     }, 1500);
   };
 
@@ -230,6 +232,7 @@ export function PodcastListening({ recordActivity }) {
 }
 
 export function ShadowingDrill({ recordActivity }) {
+  const navigate = useNavigate();
   const { data, loading, saveData } = useFeatureData('shadowing');
   const [tab, setTab] = useState('practice');
   const [sessionIndex, setSessionIndex] = useState(0);
@@ -249,6 +252,7 @@ export function ShadowingDrill({ recordActivity }) {
       utterance.rate = 0.9;
       utterance.onstart = () => setIsPlaying(true);
       utterance.onend = () => setIsPlaying(false);
+      utterance.onerror = () => setIsPlaying(false);
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -257,7 +261,7 @@ export function ShadowingDrill({ recordActivity }) {
     setIsDone(true);
     if (recordActivity) recordActivity();
     setTimeout(() => {
-      window.location.hash = '#/';
+      navigate('/');
     }, 1500);
   };
 
@@ -317,6 +321,7 @@ export function ShadowingDrill({ recordActivity }) {
 }
 
 export function WritingAnalyzer({ recordActivity }) {
+  const navigate = useNavigate();
   const [text, setText] = useState('');
   const [issues, setIssues] = useState([]);
   const [isAnalyzed, setIsAnalyzed] = useState(false);
@@ -357,7 +362,7 @@ export function WritingAnalyzer({ recordActivity }) {
 
   const handleComplete = () => {
     if (recordActivity) recordActivity();
-    window.location.hash = '#/';
+    navigate('/');
   };
 
   return (
@@ -415,6 +420,7 @@ export function WritingAnalyzer({ recordActivity }) {
 }
 
 export function DictationDrill({ recordActivity, mistakes = [], setMistakes = null }) {
+  const navigate = useNavigate();
   const { data, loading, saveData } = useFeatureData('dictation');
   const [tab, setTab] = useState('practice');
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -473,7 +479,7 @@ export function DictationDrill({ recordActivity, mistakes = [], setMistakes = nu
       setCurrentIndex(currentIndex + 1);
     } else {
       recordActivity();
-      window.location.hash = '#/';
+      navigate('/');
     }
   };
 

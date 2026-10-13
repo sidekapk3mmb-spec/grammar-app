@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlayCircle, ArrowRight, ArrowLeft, CheckCircle2, RotateCcw, Save, Trash2, Edit3, XCircle, Search, Filter } from 'lucide-react';
+import { PlayCircle, CheckCircle2, RotateCcw, Trash2, Edit3, XCircle, Search } from 'lucide-react';
 
 function useLocalStorage(key: string, initialValue: any) {
   const [storedValue, setStoredValue] = useState(() => {
