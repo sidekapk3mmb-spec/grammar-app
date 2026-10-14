@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { BookOpen, Edit3, Save, Layout, PlayCircle, ArrowRight, ArrowLeft, Search, Bookmark, BookmarkCheck, ChevronDown, ChevronRight, CheckCircle2, XCircle, Trash2, Plus, BrainCircuit, RefreshCw, Zap, Flame, Upload, Download, AlertTriangle, Shuffle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,6 +33,19 @@ function useLocalStorage(key, initialValue) {
 function normalizeText(text) {
   if (!text) return '';
   return text.toLowerCase().replace(/['`’]/g, "'").replace(/\s+/g, ' ').trim().replace(/[.!?]$/, '');
+}
+
+// Scroll restoration to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const mainEl = document.querySelector('.main-content');
+    if (mainEl) {
+      mainEl.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
+  return null;
 }
 
 // --- DICTIONARY FOR TOOLTIPS ---
@@ -100,7 +113,13 @@ function App() {
 
     fetch('/api/units')
       .then(res => res.json())
-      .then(d => setData(d))
+      .then(d => {
+        if (d && Array.isArray(d.units)) {
+          setData(d);
+        } else {
+          console.error("Invalid units data", d);
+        }
+      })
       .catch(e => console.error(e));
   }, [lastActive, setStreak]);
 
@@ -121,62 +140,128 @@ function App() {
     }
   };
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
   if (!data) return <div className="loading-screen"><div className="spinner"></div>Building Learning Platform...</div>;
 
   return (
     <Router>
-      <div className="app-layout">
-        <div className="mobile-header">
-          <div className="mobile-header-brand">
+      <ScrollToTop />
+      <AppContent 
+        data={data}
+        setData={setData}
+        bookmarks={bookmarks}
+        setBookmarks={setBookmarks}
+        progress={progress}
+        setProgress={setProgress}
+        mistakes={mistakes}
+        setMistakes={setMistakes}
+        streak={streak}
+        recordActivity={recordActivity}
+        dailyTasks={dailyTasks}
+        setDailyTasks={setDailyTasks}
+      />
+    </Router>
+  );
+}
+
+function AppContent({ data, setData, bookmarks, setBookmarks, progress, setProgress, mistakes, setMistakes, streak, recordActivity, dailyTasks, setDailyTasks }) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
+  const openSidebar = useCallback(() => {
+    setIsSidebarOpen(true);
+  }, []);
+
+  return (
+    <div className="app-layout">
+      <div className="mobile-header">
+        <div className="mobile-header-left">
+          {location.pathname !== '/' && (
+            <button 
+              className="mobile-back-btn" 
+              onClick={() => navigate(-1)} 
+              aria-label="Kembali"
+              title="Kembali"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <Link to="/" className="mobile-header-brand" onClick={closeSidebar}>
             <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
             <span>Grammar Base</span>
-          </div>
-          <button className="btn-icon" onClick={() => setIsSidebarOpen(true)}>
-            <Menu size={24} />
-          </button>
+          </Link>
         </div>
-        
-        {isSidebarOpen && (
-          <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
-        )}
-
-        <Sidebar 
-          data={data} 
-          bookmarks={bookmarks} 
-          progress={progress} 
-          mistakes={mistakes} 
-          isOpen={isSidebarOpen}
-          closeSidebar={() => setIsSidebarOpen(false)}
-        />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard data={data} progress={progress} bookmarks={bookmarks} mistakes={mistakes} streak={streak} dailyTasks={dailyTasks} setDailyTasks={setDailyTasks} />} />
-            <Route path="/unit/:id" element={<UnitContainer data={data} setData={setData} bookmarks={bookmarks} setBookmarks={setBookmarks} progress={progress} setProgress={setProgress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
-            <Route path="/drill" element={<MistakeDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
-            <Route path="/daily" element={<DailyQuiz data={data} progress={progress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
-              recordActivity();
-              setDailyTasks(tasks => tasks.map(t => t.id === 'mix' ? {...t, done: true} : t));
-            }} />} />
-            <Route path="/mixed" element={<MixedDrill data={data} progress={progress} recordActivity={recordActivity} />} />
-            <Route path="/vocab" element={<VocabEngine deckName="daily" title="Daily Vocab" initialData={vocabData} recordActivity={() => {
-              recordActivity();
-              setDailyTasks(tasks => tasks.map(t => t.id === 'vocab' ? {...t, done: true} : t));
-            }} />} />
-            <Route path="/ielts" element={<VocabEngine deckName="ielts" title="IELTS Vocab" initialData={ieltsVocabData} recordActivity={recordActivity} />} />
-            <Route path="/writing" element={<WritingAnalyzer recordActivity={recordActivity} />} />
-            <Route path="/dictation" element={<DictationDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
-              recordActivity();
-              setDailyTasks(tasks => tasks.map(t => t.id === 'dictation' ? {...t, done: true} : t));
-            }} />} />
-            <Route path="/shadowing" element={<ShadowingDrill recordActivity={recordActivity} />} />
-            <Route path="/podcast" element={<PodcastListening recordActivity={recordActivity} />} />
-            <Route path="/error-log" element={<ErrorLog mistakes={mistakes} setMistakes={setMistakes} />} />
-                      </Routes>
-        </main>
+        <button className="btn-icon" onClick={openSidebar} aria-label="Buka menu navigasi">
+          <Menu size={24} />
+        </button>
       </div>
-    </Router>
+      
+      {isSidebarOpen && (
+        <div className="sidebar-backdrop" onClick={closeSidebar} />
+      )}
+
+      <Sidebar 
+        data={data} 
+        bookmarks={bookmarks} 
+        progress={progress} 
+        mistakes={mistakes} 
+        isOpen={isSidebarOpen}
+        closeSidebar={closeSidebar}
+      />
+
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Dashboard data={data} progress={progress} bookmarks={bookmarks} mistakes={mistakes} streak={streak} dailyTasks={dailyTasks} setDailyTasks={setDailyTasks} />} />
+          <Route path="/unit/:id" element={<UnitContainer data={data} setData={setData} bookmarks={bookmarks} setBookmarks={setBookmarks} progress={progress} setProgress={setProgress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
+          <Route path="/drill" element={<MistakeDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={recordActivity} />} />
+          <Route path="/daily" element={<DailyQuiz data={data} progress={progress} mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
+            recordActivity();
+            setDailyTasks(tasks => tasks.map(t => t.id === 'mix' ? {...t, done: true} : t));
+          }} />} />
+          <Route path="/mixed" element={<MixedDrill data={data} progress={progress} recordActivity={recordActivity} />} />
+          <Route path="/vocab" element={<VocabEngine deckName="daily" title="Daily Vocab" initialData={vocabData} recordActivity={() => {
+            recordActivity();
+            setDailyTasks(tasks => tasks.map(t => t.id === 'vocab' ? {...t, done: true} : t));
+          }} />} />
+          <Route path="/ielts" element={<VocabEngine deckName="ielts" title="IELTS Vocab" initialData={ieltsVocabData} recordActivity={recordActivity} />} />
+          <Route path="/writing" element={<WritingAnalyzer recordActivity={recordActivity} />} />
+          <Route path="/dictation" element={<DictationDrill mistakes={mistakes} setMistakes={setMistakes} recordActivity={() => {
+            recordActivity();
+            setDailyTasks(tasks => tasks.map(t => t.id === 'dictation' ? {...t, done: true} : t));
+          }} />} />
+          <Route path="/shadowing" element={<ShadowingDrill recordActivity={recordActivity} />} />
+          <Route path="/podcast" element={<PodcastListening recordActivity={recordActivity} />} />
+          <Route path="/error-log" element={<ErrorLog mistakes={mistakes} setMistakes={setMistakes} />} />
+        </Routes>
+      </main>
+
+      <nav className="bottom-nav">
+        <Link to="/" className={`bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`} onClick={closeSidebar}>
+          <Layout size={18} />
+          <span>Home</span>
+        </Link>
+        <button className={`bottom-nav-item ${location.pathname.startsWith('/unit/') ? 'active' : ''}`} onClick={openSidebar}>
+          <BookOpen size={18} />
+          <span>Units</span>
+        </button>
+        <Link to="/daily" className={`bottom-nav-item ${location.pathname === '/daily' ? 'active' : ''}`} onClick={closeSidebar}>
+          <Zap size={18} />
+          <span>Daily Mix</span>
+        </Link>
+        <Link to="/vocab" className={`bottom-nav-item ${location.pathname === '/vocab' ? 'active' : ''}`} onClick={closeSidebar}>
+          <Flame size={18} />
+          <span>Vocab</span>
+        </Link>
+        <button className={`bottom-nav-item ${isSidebarOpen ? 'active' : ''}`} onClick={() => setIsSidebarOpen(prev => !prev)}>
+          <Menu size={18} />
+          <span>Menu</span>
+        </button>
+      </nav>
+    </div>
   );
 }
 
@@ -186,12 +271,23 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSections, setExpandedSections] = useState({});
+  const prevPathRef = useRef(location.pathname);
 
+  // Only auto-close on mobile if the route path actually changes
   useEffect(() => {
+    if (prevPathRef.current !== location.pathname) {
+      prevPathRef.current = location.pathname;
+      if (window.innerWidth <= 768 && closeSidebar) {
+        closeSidebar();
+      }
+    }
+  }, [location.pathname, closeSidebar]);
+
+  const handleLinkClick = () => {
     if (window.innerWidth <= 768 && closeSidebar) {
       closeSidebar();
     }
-  }, [location.pathname, closeSidebar]);
+  };
 
   const sections = useMemo(() => {
     const secs = [];
@@ -215,11 +311,11 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
-        <div className="sidebar-brand">
-        <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
-      <span>Grammar Base</span>
-        </div>
-        <button className="btn-icon close-sidebar-btn" onClick={closeSidebar}>
+        <Link to="/" className="sidebar-brand" onClick={handleLinkClick}>
+          <BookOpen size={20} strokeWidth={1.5} className="text-accent" />
+          <span>Grammar Base</span>
+        </Link>
+        <button className="btn-icon close-sidebar-btn" onClick={closeSidebar} aria-label="Tutup Menu">
           <XCircle size={20} />
         </button>
       </div>
@@ -228,7 +324,7 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
         <Search size={16} className="search-icon" />
         <input 
           type="text" 
-          placeholder="Search units..." 
+          placeholder="Cari unit atau topik..." 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -236,57 +332,91 @@ function Sidebar({ data, bookmarks, progress, mistakes, isOpen, closeSidebar }) 
 
       <div className="sidebar-content">
         <div className="sidebar-section">
-          <Link to="/" className={`sidebar-link ${location.pathname === '/' ? 'active' : ''}`}>
+          <div className="sidebar-section-heading">Navigasi Utama</div>
+          <Link to="/" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/' ? 'active' : ''}`}>
             <Layout size={16} /> Dashboard
           </Link>
-          <Link to="/mixed" className={`sidebar-link ${location.pathname === '/mixed' ? 'active' : ''}`}>
+          <Link to="/daily" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/daily' ? 'active' : ''}`}>
+            <Zap size={16} style={{color: '#ea580c'}} /> Daily Mix Quiz
+          </Link>
+          <Link to="/mixed" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/mixed' ? 'active' : ''}`}>
             <Shuffle size={16} /> Mixed Review
           </Link>
-          <Link to="/daily" className={`sidebar-link ${location.pathname === '/daily' ? 'active' : ''}`}>
-            <Zap size={16} /> Daily Mix Quiz
+          <Link to="/error-log" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/error-log' ? 'active' : ''}`} style={{color: mistakes.length > 0 ? 'var(--danger)' : undefined}}>
+            <AlertTriangle size={16} /> Error Log
+            {mistakes.length > 0 && (
+              <span className="badge" style={{background: 'var(--danger-bg)', color: 'var(--danger)', marginLeft: 'auto', padding: '1px 6px', fontSize: '0.75rem'}}>
+                {mistakes.length}
+              </span>
+            )}
           </Link>
           {mistakes.length > 0 && (
-            <Link to="/drill" className={`sidebar-link ${location.pathname === '/drill' ? 'active' : ''}`} style={{color: 'var(--danger)', marginTop: '0.25rem'}}>
-              <BrainCircuit size={16} /> Mistake Drill ({mistakes.length})
+            <Link to="/drill" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/drill' ? 'active' : ''}`} style={{color: 'var(--danger)'}}>
+              <BrainCircuit size={16} /> Mistake Flashcards
             </Link>
           )}
-          
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-heading">Fitur Praktik</div>
+          <Link to="/vocab" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/vocab' ? 'active' : ''}`}>
+            <BookOpen size={16} style={{color: '#0284c7'}} /> Daily Vocab
+          </Link>
+          <Link to="/ielts" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/ielts' ? 'active' : ''}`}>
+            <Flame size={16} style={{color: '#16a34a'}} /> IELTS Vocab
+          </Link>
+          <Link to="/dictation" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/dictation' ? 'active' : ''}`}>
+            <PlayCircle size={16} style={{color: '#c026d3'}} /> Dictation Drill
+          </Link>
+          <Link to="/shadowing" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/shadowing' ? 'active' : ''}`}>
+            <PlayCircle size={16} style={{color: '#ca8a04'}} /> Speaking Shadowing
+          </Link>
+          <Link to="/writing" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/writing' ? 'active' : ''}`}>
+            <Edit3 size={16} style={{color: '#2563eb'}} /> Writing Analyzer
+          </Link>
+          <Link to="/podcast" onClick={handleLinkClick} className={`sidebar-link ${location.pathname === '/podcast' ? 'active' : ''}`}>
+            <PlayCircle size={16} style={{color: '#e11d48'}} /> Podcast Tracker
+          </Link>
         </div>
         
-        {sections.map((sec, idx) => {
-          const isExpanded = expandedSections[sec.title] !== false || searchQuery !== '';
-          return (
-            <div key={idx} className="sidebar-section">
-              <h3 onClick={() => toggleSection(sec.title)} className="section-title-toggle">
-                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                {sec.title}
-              </h3>
-              
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} exit={{opacity:0, height:0}} className="section-units">
-                    {sec.units.map(u => {
-                      const isBookmarked = bookmarks.includes(u.unit);
-                      const isCompleted = progress[u.unit] !== undefined;
-                      return (
-                        <Link 
-                          to={`/unit/${u.unit}`} 
-                          key={u.unit} 
-                          className={`sidebar-link unit-link ${location.pathname === `/unit/${u.unit}` ? 'active' : ''}`}
-                        >
-                          <span className="unit-num">{u.unit}.</span>
-                          <span className="unit-name">{u.title}</span>
-                          {isBookmarked && <BookmarkCheck size={12} className="icon-bookmarked" />}
-                          {isCompleted && <CheckCircle2 size={12} className="icon-completed" />}
-                        </Link>
-                      )
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
+        <div className="sidebar-section">
+          <div className="sidebar-section-heading">Grammar Units ({data.units.length})</div>
+          {sections.map((sec, idx) => {
+            const isExpanded = expandedSections[sec.title] !== false || searchQuery !== '';
+            return (
+              <div key={idx} style={{marginBottom: '0.75rem'}}>
+                <h3 onClick={() => toggleSection(sec.title)} className="section-title-toggle">
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  {sec.title}
+                </h3>
+                
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} exit={{opacity:0, height:0}} className="section-units">
+                      {sec.units.map(u => {
+                        const isBookmarked = bookmarks.includes(u.unit);
+                        const isCompleted = progress[u.unit] !== undefined;
+                        return (
+                          <Link 
+                            to={`/unit/${u.unit}`} 
+                            key={u.unit} 
+                            onClick={handleLinkClick}
+                            className={`sidebar-link unit-link ${location.pathname === `/unit/${u.unit}` ? 'active' : ''}`}
+                          >
+                            <span className="unit-num">{u.unit}.</span>
+                            <span className="unit-name">{u.title}</span>
+                            {isBookmarked && <BookmarkCheck size={12} className="icon-bookmarked" />}
+                            {isCompleted && <CheckCircle2 size={12} className="icon-completed" />}
+                          </Link>
+                        )
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );
@@ -496,6 +626,7 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
   const [qIndex, setQIndex] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [inputValue, setInputValue] = useState('');
+  const [reorderSelected, setReorderSelected] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const navigate = useNavigate();
@@ -581,9 +712,17 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
     setFeedback({ isCorrect, explanation: q.explanation, correctAns });
   };
 
+  const handleReorderCheck = () => {
+    if (feedback || !q.words || reorderSelected.length !== q.words.length) return;
+    const answerStr = reorderSelected.join(' ');
+    const isCorrect = (q.accepted_answers || []).some((ans: string) => normalizeText(ans) === normalizeText(answerStr));
+    handleAnswer(isCorrect, (q.accepted_answers && q.accepted_answers[0]) || answerStr);
+  };
+
   const nextQuestion = () => {
     setFeedback(null);
     setInputValue('');
+    setReorderSelected([]);
     if (qIndex < questions.length - 1) {
       setQIndex(prev => prev + 1);
     } else {
@@ -598,15 +737,41 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
       <div className="quiz-progress-bar"><div className="quiz-progress-fill" style={{width: `${(qIndex / questions.length) * 100}%`}}></div></div>
       <h3 className="quiz-prompt"><RichText text={q.prompt} /></h3>
       
-      {q.type === 'multiple_choice' ? (
+      {q.type === 'multiple_choice' && (
         <div className="options-grid">
-          {q.options.map((opt: string, idx: number) => (
+          {q.options && q.options.map((opt: string, idx: number) => (
             <button key={idx} className={`quiz-option ${feedback ? (idx === q.answer_index ? 'correct' : (idx !== q.answer_index && !feedback.isCorrect ? 'disabled' : '')) : ''}`} onClick={() => handleAnswer(idx === q.answer_index, q.options[q.answer_index])}>
               <RichText text={opt} />
             </button>
           ))}
         </div>
-      ) : (
+      )}
+
+      {q.type === 'reorder' && (
+        <div className="reorder-container">
+          <div className="reorder-dropzone" style={{minHeight: '50px', padding: '1rem', border: '2px dashed var(--border)', borderRadius: 'var(--radius)', marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+            {reorderSelected.length === 0 && <span style={{color: 'var(--text-muted)'}}>Pilih kata-kata di bawah...</span>}
+            {reorderSelected.map((w, i) => (
+              <span key={i} className="badge" style={{fontSize: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', background: 'var(--accent)', color: 'white'}} onClick={() => { if(!feedback) { const n = [...reorderSelected]; n.splice(i,1); setReorderSelected(n); } }}>{w}</span>
+            ))}
+          </div>
+          <div className="reorder-words" style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem'}}>
+            {q.words && q.words.map((w: string, i: number) => {
+               const selectedCount = reorderSelected.filter(sw => sw === w).length;
+               const totalCount = q.words.filter((tw: string) => tw === w).length;
+               const disabled = selectedCount >= totalCount || feedback !== null;
+               return (
+                 <button key={i} className="btn btn-outline" style={{padding: '0.5rem 1rem', opacity: disabled ? 0.5 : 1}} disabled={disabled} onClick={() => { if(!feedback) setReorderSelected([...reorderSelected, w]); }}>{w}</button>
+               );
+            })}
+          </div>
+          {!feedback && q.words && reorderSelected.length === q.words.length && (
+            <button className="btn btn-primary" onClick={handleReorderCheck}>Check Answer</button>
+          )}
+        </div>
+      )}
+
+      {q.type !== 'multiple_choice' && q.type !== 'reorder' && (
         <div className="fill-blank-container">
           <input 
             type="text" 
@@ -618,14 +783,14 @@ function DailyQuiz({ data, progress, mistakes, setMistakes, recordActivity }) {
             disabled={feedback !== null} 
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                handleAnswer(q.accepted_answers.some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0]);
+                handleAnswer((q.accepted_answers || []).some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), (q.accepted_answers || [])[0] || '');
               }
             }} 
           />
           {!feedback && (
             <button 
               className="btn btn-primary mt-3" 
-              onClick={() => handleAnswer(q.accepted_answers.some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), q.accepted_answers[0])}
+              onClick={() => handleAnswer((q.accepted_answers || []).some((ans: string) => normalizeText(ans) === normalizeText(inputValue)), (q.accepted_answers || [])[0] || '')}
               disabled={!inputValue.trim()}
             >
               Check Answer
@@ -708,7 +873,10 @@ function MixedDrill({ data, progress, recordActivity }) {
         <CheckCircle2 size={64} className="text-success mx-auto" />
         <h2 style={{marginTop: '1rem'}}>Review Complete!</h2>
         <p>You scored <strong>{score}</strong> out of {questions.length}</p>
-        <button className="btn btn-primary mt-4" onClick={() => { setSetupMode(true); setQIndex(0); setScore(0); setShowResult(false); }}>New Mixed Drill</button>
+        <div style={{display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap'}}>
+          <button className="btn btn-primary" onClick={() => { setSetupMode(true); setQIndex(0); setScore(0); setShowResult(false); }}>New Mixed Drill</button>
+          <button className="btn btn-outline" onClick={() => navigate('/')}>Kembali ke Dashboard</button>
+        </div>
       </div>
     );
   }
@@ -821,7 +989,7 @@ function ErrorLog({ mistakes, setMistakes }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
 
-  const grammarMistakes = mistakes.filter(m => !m.type || m.type === 'grammar');
+  const grammarMistakes = mistakes.filter(m => m.type !== 'dictation');
   const dictationMistakes = mistakes.filter(m => m.type === 'dictation');
 
   const filtered = filter === 'grammar' ? grammarMistakes : filter === 'dictation' ? dictationMistakes : mistakes;
@@ -887,7 +1055,7 @@ function ErrorLog({ mistakes, setMistakes }) {
               </div>
             );
           })}
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={() => navigate('/daily')}>Latih Semua di Daily Mix</button>
             <button className="btn btn-outline" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => { if(confirm('Hapus seluruh error log?')) setMistakes([]); }}>Bersihkan Log</button>
           </div>
@@ -904,7 +1072,7 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
   const [showAnswer, setShowAnswer] = useState(false);
   const navigate = useNavigate();
 
-  if (mistakes.length === 0) {
+  if (!mistakes || mistakes.length === 0) {
     return (
       <div className="content-box" style={{textAlign: 'center', padding: '4rem', maxWidth: '600px', margin: '2rem auto'}}>
         <CheckCircle2 size={48} className="text-success mx-auto" style={{marginBottom: '1rem'}} />
@@ -915,7 +1083,17 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
     );
   }
 
-  const q = mistakes[currentIndex];
+  const q = mistakes[currentIndex] || mistakes[0];
+  const isDictation = q?.type === 'dictation';
+
+  const playAudio = (text: string) => {
+    if ('speechSynthesis' in window && text) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const handleMastered = () => {
     const newMistakes = [...mistakes];
@@ -933,6 +1111,14 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
     setCurrentIndex((currentIndex + 1) % mistakes.length);
   };
 
+  const getAnswerText = () => {
+    if (!q) return '';
+    if (isDictation) return q.text || '';
+    if (q.type === 'multiple_choice' && q.options) return q.options[q.answer_index] || '';
+    if (Array.isArray(q.accepted_answers)) return q.accepted_answers.join(' OR ');
+    return q.accepted_answers || q.prompt || '';
+  };
+
   return (
     <motion.div initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} className="drill-container">
       <div className="drill-header">
@@ -942,13 +1128,31 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
       
       <div className="flashcard">
         <div className="flashcard-front">
-          <div className="badge mb-2">Unit {q.unitId}</div>
-          <h3 className="quiz-prompt"><RichText text={q.prompt} /></h3>
-          
-          {q.type === 'multiple_choice' && (
-            <ul className="flashcard-options">
-              {q.options.map((opt, i) => <li key={i}>{opt}</li>)}
-            </ul>
+          <div className="badge mb-2" style={{background: isDictation ? '#fdf4ff' : 'var(--danger-bg)', color: isDictation ? '#c026d3' : 'var(--danger)'}}>
+            {isDictation ? 'Dictation Mistake' : `Unit ${q.unitId || 'Review'}`}
+          </div>
+
+          {isDictation ? (
+            <div style={{textAlign: 'center', marginTop: '0.5rem'}}>
+              <h3 className="quiz-prompt">Listen and recall sentence:</h3>
+              <button className="btn-icon audio-btn" style={{margin: '1rem auto', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: '#fdf4ff', padding: '0.5rem 1rem', borderRadius: '50px'}} onClick={() => playAudio(q.text)}>
+                <PlayCircle size={28} color="#c026d3" /> <span style={{fontWeight: 600, color: '#c026d3'}}>Play Audio</span>
+              </button>
+              {q.userInput && (
+                <div style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem'}}>
+                  Kamu sebelumnya tulis: <em>"{q.userInput}"</em>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <h3 className="quiz-prompt"><RichText text={q.prompt || ''} /></h3>
+              {q.type === 'multiple_choice' && q.options && (
+                <ul className="flashcard-options">
+                  {q.options.map((opt: string, i: number) => <li key={i}>{opt}</li>)}
+                </ul>
+              )}
+            </>
           )}
         </div>
 
@@ -957,9 +1161,19 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
             <motion.div initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} className="flashcard-back">
               <div className="correct-answer-banner">
                 <strong>Answer: </strong> 
-                {q.type === 'multiple_choice' ? q.options[q.answer_index] : q.accepted_answers.join(' OR ')}
+                {getAnswerText()}
               </div>
-              <p className="flashcard-explanation"><RichText text={q.explanation} /></p>
+              {q.explanation && <p className="flashcard-explanation"><RichText text={q.explanation} /></p>}
+              {isDictation && q.wrongWords?.length > 0 && (
+                <div style={{marginTop: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', justifyContent: 'center'}}>
+                  <span style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '0.3rem'}}>Kata salah:</span>
+                  {q.wrongWords.map((w: string, wi: number) => (
+                    <span key={wi} style={{padding: '2px 8px', borderRadius: '4px', background: '#fee2e2', color: '#991b1b', fontSize: '0.85rem'}}>
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -978,6 +1192,12 @@ function MistakeDrill({ mistakes, setMistakes, recordActivity }) {
             </button>
           </div>
         )}
+      </div>
+
+      <div style={{textAlign: 'center', marginTop: '1.5rem'}}>
+        <button className="btn btn-outline" style={{fontSize: '0.9rem'}} onClick={() => navigate('/')}>
+          <ArrowLeft size={14} style={{marginRight: '0.25rem', verticalAlign: 'middle'}} /> Kembali ke Dashboard
+        </button>
       </div>
     </motion.div>
   );

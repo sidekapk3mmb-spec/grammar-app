@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlayCircle, CheckCircle2, RotateCcw, Trash2, Edit3, XCircle, Search } from 'lucide-react';
 
@@ -119,7 +120,10 @@ export function VocabEngine({ deckName, title, initialData, recordActivity }: { 
           <CheckCircle2 size={64} style={{ color: 'var(--success)', margin: '0 auto 1rem' }} />
           <h2>You're all caught up!</h2>
           <p className="text-muted">You have reviewed all your due cards for {title}.</p>
-          <button className="btn btn-outline mt-4" onClick={() => setTab('manage')}>View Vocab List</button>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+            <Link to="/" className="btn btn-primary">Kembali ke Dashboard</Link>
+            <button className="btn btn-outline" onClick={() => setTab('manage')}>Daftar Kosakata</button>
+          </div>
         </div>
       );
     }
@@ -160,12 +164,14 @@ export function VocabEngine({ deckName, title, initialData, recordActivity }: { 
                     <strong>EN:</strong> {currentCard.definition}
                   </div>
                 )}
-                <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', lineHeight: '1.6' }}>
-                  <span dangerouslySetInnerHTML={{ __html: currentCard.example.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent)">$1</strong>') }} />
-                  <button className="btn-icon" style={{ marginLeft: '0.5rem', verticalAlign: 'middle', display: 'inline-flex' }} onClick={() => playAudio(currentCard.example)}>
-                    <PlayCircle size={16} />
-                  </button>
-                </div>
+                {currentCard.example && (
+                  <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', lineHeight: '1.6' }}>
+                    <span dangerouslySetInnerHTML={{ __html: (currentCard.example || '').replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent)">$1</strong>') }} />
+                    <button className="btn-icon" style={{ marginLeft: '0.5rem', verticalAlign: 'middle', display: 'inline-flex' }} onClick={() => playAudio(currentCard.example)}>
+                      <PlayCircle size={16} />
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
